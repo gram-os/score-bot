@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Leaderboard</h2>
+
+<form class="filters" method="get" action="/admin/leaderboard">
+  <div class="filter-group">
+    <label>Period</label>
+    <select name="period">
+      {% for p in ['daily', 'weekly', 'monthly', 'alltime'] %}
+      <option value="{{ p }}" {% if period == p %}selected{% endif %}>{{ p | capitalize }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Game</label>
+    <select name="game">
+      <option value="">All games</option>
+      {% for g in games %}
+      <option value="{{ g.id }}" {% if game == g.id %}selected{% endif %}>{{ g.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group" style="justify-content: flex-end;">
+    <button type="submit" class="btn btn-primary">View</button>
+  </div>
+</form>
+
+{% if rows %}
+<table>
+  <thead>
+    <tr>
+      <th>Rank</th>
+      <th>Username</th>
+      <th>Score</th>
+      <th>Submissions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td class="rank-{{ row.rank }}">{{ row.rank }}</td>
+      <td>{{ row.username }}</td>
+      <td><strong>{{ row.total_score | int }}</strong></td>
+      <td>{{ row.submission_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No data for this period/game combination.</div>
+{% endif %}
+{% endblock %}
