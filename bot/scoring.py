@@ -1,0 +1,26 @@
+from datetime import date
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from bot.database import Submission
+
+
+def calculate_speed_bonus(rank: int) -> int:
+    return {1: 15, 2: 10, 3: 5}.get(rank, 0)
+
+
+def assign_submission_rank(session: Session, game_id: str, submission_date: date) -> None:
+    submissions = session.scalars(
+        select(Submission)
+        .where(Submission.game_id == game_id, Submission.date == submission_date)
+        .order_by(Submission.submitted_at)
+    ).all()
+
+    for rank, submission in enumerate(submissions, start=1):
+        bonus = calculate_speed_bonus(rank)
+        submission.submission_rank = rank
+        submission.speed_bonus = bonus
+        submission.total_score = submission.base_score + bonus
+
+    session.flush()

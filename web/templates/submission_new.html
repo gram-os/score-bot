@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Add Submission — Score Bot Admin{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="/admin/submissions" style="color:#666; text-decoration:none; font-size:13px;">&larr; Back</a>
+  <h2 style="margin-bottom:0;">Add Submission</h2>
+</div>
+
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<form method="post" action="/admin/submissions/new" style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:24px; max-width:520px;">
+  <div style="display:flex; flex-direction:column; gap:14px;">
+
+    <div class="filter-group">
+      <label>Discord User ID</label>
+      <input type="text" name="user_id" required placeholder="e.g. 123456789">
+    </div>
+
+    <div class="filter-group">
+      <label>Username</label>
+      <input type="text" name="username" required placeholder="display name">
+    </div>
+
+    <div class="filter-group">
+      <label>Game</label>
+      <select name="game_id" required>
+        {% for g in games %}
+        <option value="{{ g.id }}">{{ g.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Date</label>
+      <input type="date" name="date" required value="{{ today }}">
+    </div>
+
+    <div class="filter-group">
+      <label>Base Score</label>
+      <input type="number" name="base_score" required step="any" min="0" placeholder="e.g. 75">
+    </div>
+
+    <div class="filter-group">
+      <label>Raw Data (JSON)</label>
+      <textarea name="raw_data" rows="4" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; font-family:monospace;">{}</textarea>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-top:4px;">
+      <button type="submit" class="btn btn-primary">Add Submission</button>
+      <a href="/admin/submissions" class="btn btn-secondary" style="text-decoration:none; line-height:1.6;">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

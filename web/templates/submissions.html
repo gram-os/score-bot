@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Submissions — Score Bot Admin{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+  <h2 style="margin-bottom:0;">Submissions</h2>
+  <a href="/admin/submissions/new" class="btn btn-primary" style="text-decoration:none;">+ Add Submission</a>
+</div>
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<form class="filters" method="get" action="/admin/submissions">
+  <div class="filter-group">
+    <label>Game</label>
+    <select name="game">
+      <option value="">All games</option>
+      {% for g in games %}
+      <option value="{{ g.id }}" {% if filters.game == g.id %}selected{% endif %}>{{ g.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>User</label>
+    <input type="text" name="user" value="{{ filters.user }}" placeholder="username…">
+  </div>
+  <div class="filter-group">
+    <label>Date</label>
+    <input type="date" name="date" value="{{ filters.date }}">
+  </div>
+  <div class="filter-group" style="justify-content: flex-end;">
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="/admin/submissions" class="btn btn-secondary" style="margin-left:6px; text-decoration:none; line-height:1.6;">Clear</a>
+  </div>
+</form>
+
+{% if submissions %}
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Username</th>
+      <th>Game</th>
+      <th>Date</th>
+      <th>Base Score</th>
+      <th>Speed Bonus</th>
+      <th>Total Score</th>
+      <th>Rank</th>
+      <th>Submitted At</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in submissions %}
+    <tr>
+      <td>{{ s.id }}</td>
+      <td>{{ s.username }}</td>
+      <td><span class="badge badge-{{ s.game_id }}">{{ s.game_id }}</span></td>
+      <td>{{ s.date }}</td>
+      <td>{{ s.base_score | int }}</td>
+      <td>+{{ s.speed_bonus }}</td>
+      <td><strong>{{ s.total_score | int }}</strong></td>
+      <td>{{ s.submission_rank }}</td>
+      <td>{{ s.submitted_at.strftime('%Y-%m-%d %H:%M') if s.submitted_at else '' }}</td>
+      <td>
+        <form method="post" action="/admin/submissions/{{ s.id }}/delete"
+              onsubmit="return confirm('Delete this submission?')">
+          <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="{{ page_url(page - 1) }}">&laquo; Prev</a>
+  {% endif %}
+  <span class="current">Page {{ page }}</span>
+  {% if has_next %}
+  <a href="{{ page_url(page + 1) }}">Next &raquo;</a>
+  {% endif %}
+  <span style="color:#999; font-size:12px;">{{ total }} total</span>
+</div>
+{% else %}
+<div class="empty">No submissions found.</div>
+{% endif %}
+{% endblock %}

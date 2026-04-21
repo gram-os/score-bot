@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Games — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Games</h2>
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Submissions</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for g in games %}
+    <tr>
+      <td><code>{{ g.id }}</code></td>
+      <td>{{ g.name }}</td>
+      <td>{{ counts.get(g.id, 0) }}</td>
+      <td>
+        {% if g.enabled %}
+        <span style="color:#27ae60; font-weight:600;">Enabled</span>
+        {% else %}
+        <span style="color:#95a5a6; font-weight:600;">Disabled</span>
+        {% endif %}
+      </td>
+      <td>
+        <form method="post" action="/admin/games/{{ g.id }}/toggle">
+          <button type="submit" class="btn {% if g.enabled %}toggle-on{% else %}toggle-off{% endif %}">
+            {% if g.enabled %}Disable{% else %}Enable{% endif %}
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
