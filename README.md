@@ -14,7 +14,7 @@ All three share a SQLite database persisted to `./data/scores.db`.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- [Podman](https://podman.io/) and [podman-compose](https://github.com/containers/podman-compose)
 - A Discord application with a bot token and OAuth2 credentials (see below)
 
 ## Environment Variables
@@ -64,7 +64,7 @@ The admin panel is available at [http://localhost:8000](http://localhost:8000).
 | Target | Description |
 |--------|-------------|
 | `make setup` | Copy `.env.example` → `.env`, generate `SECRET_KEY` |
-| `make build` | Build Docker images |
+| `make build` | Build Podman images |
 | `make up` | Start all services in the background |
 | `make down` | Stop all services |
 | `make logs` | Tail logs from all services |

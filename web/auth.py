@@ -151,9 +151,9 @@ async def submissions_list(
 
     flash = request.session.pop("flash", None)
     return templates.TemplateResponse(
+        request,
         "submissions.html",
         {
-            "request": request,
             "active": "submissions",
             "submissions": rows,
             "games": games,
@@ -194,9 +194,9 @@ async def submission_new_form(
     finally:
         db.close()
     return templates.TemplateResponse(
+        request,
         "submission_new.html",
         {
-            "request": request,
             "active": "submissions",
             "games": games,
             "today": date_type.today().isoformat(),
@@ -223,9 +223,9 @@ async def submission_new_submit(
             parsed_raw = json.loads(raw_data) if raw_data.strip() else {}
         except json.JSONDecodeError as e:
             return templates.TemplateResponse(
+                request,
                 "submission_new.html",
                 {
-                    "request": request,
                     "active": "submissions",
                     "games": games,
                     "today": date,
@@ -261,9 +261,9 @@ async def games_list(
         db.close()
     flash = request.session.pop("flash", None)
     return templates.TemplateResponse(
+        request,
         "games.html",
         {
-            "request": request,
             "active": "games",
             "games": games,
             "counts": counts,
@@ -309,9 +309,9 @@ async def leaderboard_view(
         db.close()
 
     return templates.TemplateResponse(
+        request,
         "leaderboard.html",
         {
-            "request": request,
             "active": "leaderboard",
             "rows": rows,
             "games": games,

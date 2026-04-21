@@ -113,8 +113,8 @@ class ScoreBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s (id=%s)", self.user, self.user.id)
-        guilds = self.guilds
-        for guild in guilds:
+        await self.tree.sync()
+        for guild in self.guilds:
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
             log.info("Synced slash commands to guild %s", guild.name)
