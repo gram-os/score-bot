@@ -1,4 +1,4 @@
-.PHONY: help setup build up down logs migrate shell clean
+.PHONY: help setup build up down logs migrate shell clean test test-unit test-integration
 
 help:
 	@echo "Usage: make <target>"
@@ -53,3 +53,11 @@ shell:
 clean:
 	docker compose down -v
 	rm -rf data
+
+test: test-unit test-integration
+
+test-unit:
+	.venv/bin/pytest tests/unit -v -m unit
+
+test-integration:
+	.venv/bin/pytest tests/integration -v -m integration
