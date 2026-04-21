@@ -1,5 +1,4 @@
-import pytest
-from datetime import datetime, date, timezone
+from datetime import datetime, date
 
 from bot.parsers.wordle import WordleParser
 from bot.parsers.glyph import GlyphParser

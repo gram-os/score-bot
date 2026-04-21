@@ -1,5 +1,3 @@
-import pytest
-
 from bot.scoring import calculate_speed_bonus
 
 

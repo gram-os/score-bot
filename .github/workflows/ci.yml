@@ -21,7 +21,7 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Lint (flake8)
-        run: flake8 . --exclude=.venv,.sudocode --max-line-length=120
+        run: flake8 .
 
       - name: Format check (black)
         run: black --check . --exclude '(.venv|.sudocode)'

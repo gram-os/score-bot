@@ -1,8 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
 
-import pytest
-from sqlalchemy.orm import Session
-
 from bot.database import (
     Game,
     Submission,
