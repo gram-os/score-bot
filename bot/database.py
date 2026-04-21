@@ -70,17 +70,27 @@ def get_engine(db_path: str | None = None):
 # Submission operations
 # ---------------------------------------------------------------------------
 
-def is_duplicate(session: Session, user_id: str, game_id: str, submission_date: date) -> bool:
-    return session.scalar(
-        select(func.count()).select_from(Submission).where(
-            Submission.user_id == user_id,
-            Submission.game_id == game_id,
-            Submission.date == submission_date,
+
+def is_duplicate(
+    session: Session, user_id: str, game_id: str, submission_date: date
+) -> bool:
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(Submission)
+            .where(
+                Submission.user_id == user_id,
+                Submission.game_id == game_id,
+                Submission.date == submission_date,
+            )
         )
-    ) > 0
+        > 0
+    )
 
 
-def record_submission(session: Session, parse_result, username: str) -> "Submission | None":
+def record_submission(
+    session: Session, parse_result, username: str
+) -> "Submission | None":
     from bot.scoring import assign_submission_rank
 
     submission = Submission(
@@ -154,6 +164,7 @@ def add_submission_manual(
 # Leaderboard queries
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LeaderboardRow:
     rank: int
@@ -163,7 +174,9 @@ class LeaderboardRow:
     submission_count: int
 
 
-def _period_bounds(period: Literal["daily", "weekly", "monthly", "alltime"]) -> tuple[date | None, date | None]:
+def _period_bounds(
+    period: Literal["daily", "weekly", "monthly", "alltime"],
+) -> tuple[date | None, date | None]:
     today = datetime.now(timezone.utc).date()
     if period == "daily":
         return today, today

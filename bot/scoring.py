@@ -10,7 +10,9 @@ def calculate_speed_bonus(rank: int) -> int:
     return {1: 15, 2: 10, 3: 5}.get(rank, 0)
 
 
-def assign_submission_rank(session: Session, game_id: str, submission_date: date) -> None:
+def assign_submission_rank(
+    session: Session, game_id: str, submission_date: date
+) -> None:
     submissions = session.scalars(
         select(Submission)
         .where(Submission.game_id == game_id, Submission.date == submission_date)

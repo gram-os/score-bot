@@ -7,7 +7,13 @@ from discord import app_commands
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 
-from bot.database import Game, get_engine, get_leaderboard, is_duplicate, record_submission
+from bot.database import (
+    Game,
+    get_engine,
+    get_leaderboard,
+    is_duplicate,
+    record_submission,
+)
 from bot.parsers.registry import ParserRegistry
 
 load_dotenv()
@@ -103,7 +109,9 @@ class ScoreBot(discord.Client):
                 enabled = session.query(Game).filter(Game.enabled.is_(True)).all()
 
             if not enabled:
-                await interaction.response.send_message("No games are currently enabled.")
+                await interaction.response.send_message(
+                    "No games are currently enabled."
+                )
                 return
 
             embed = discord.Embed(title="Enabled Games", color=discord.Color.blurple())
@@ -126,7 +134,11 @@ class ScoreBot(discord.Client):
             return
 
         content = message.content
-        timestamp = message.created_at.replace(tzinfo=timezone.utc) if message.created_at.tzinfo is None else message.created_at
+        timestamp = (
+            message.created_at.replace(tzinfo=timezone.utc)
+            if message.created_at.tzinfo is None
+            else message.created_at
+        )
 
         for parser in self.registry.all_parsers():
             if not parser.can_parse(content):
@@ -143,7 +155,9 @@ class ScoreBot(discord.Client):
                 if game is None or not game.enabled:
                     break
 
-                duplicate = is_duplicate(session, result.user_id, result.game_id, result.date)
+                duplicate = is_duplicate(
+                    session, result.user_id, result.game_id, result.date
+                )
                 if not duplicate:
                     record_submission(session, result, username)
                     session.commit()

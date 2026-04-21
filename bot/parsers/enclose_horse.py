@@ -25,7 +25,9 @@ class EnclosHorseParser(GameParser):
     def can_parse(self, message: str) -> bool:
         return bool(_HEADER.match(message))
 
-    def parse(self, message: str, user_id: str, timestamp: datetime) -> ParseResult | None:
+    def parse(
+        self, message: str, user_id: str, timestamp: datetime
+    ) -> ParseResult | None:
         header_m = _HEADER.match(message)
         if not header_m:
             return None
@@ -36,7 +38,7 @@ class EnclosHorseParser(GameParser):
 
         for pct_str, horse_str in _RESULT_LINE.findall(message):
             pct = float(pct_str)
-            variant = horse_str[len(_HORSE):]
+            variant = horse_str[len(_HORSE) :]
             if not variant:
                 main_pct = pct
             else:

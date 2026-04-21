@@ -234,7 +234,9 @@ async def submission_new_submit(
                 status_code=422,
             )
         submission_date = date_type.fromisoformat(date)
-        add_submission_manual(db, user_id, username, game_id, submission_date, base_score, parsed_raw)
+        add_submission_manual(
+            db, user_id, username, game_id, submission_date, base_score, parsed_raw
+        )
         db.commit()
     finally:
         db.close()
@@ -253,8 +255,9 @@ async def games_list(
         counts = {
             row.game_id: row.count
             for row in db.execute(
-                select(Submission.game_id, func.count(Submission.id).label("count"))
-                .group_by(Submission.game_id)
+                select(
+                    Submission.game_id, func.count(Submission.id).label("count")
+                ).group_by(Submission.game_id)
             ).all()
         }
     finally:
