@@ -274,10 +274,12 @@ class TestMiniCrosswordParserParse:
 # QuordleParser
 # ---------------------------------------------------------------------------
 
-QUORDLE_LOW = "Daily Quordle #100\n2️⃣1️⃣\n1️⃣2️⃣"   # total=6 → score=70
-QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"   # total=35 → clamped to 0
-QUORDLE_FAIL = "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"    # 9+2+3+4=18 → score=0 (clamped); failed=True
-QUORDLE_MID = "Daily Quordle #400\n4️⃣5️⃣\n6️⃣7️⃣"    # total=22 → max(0,100-180)=0
+QUORDLE_LOW = "Daily Quordle #100\n2️⃣1️⃣\n1️⃣2️⃣"  # total=6 → score=70
+QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"  # total=35 → clamped to 0
+QUORDLE_FAIL = (
+    "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"  # 9+2+3+4=18 → score=0 (clamped); failed=True
+)
+QUORDLE_MID = "Daily Quordle #400\n4️⃣5️⃣\n6️⃣7️⃣"  # total=22 → max(0,100-180)=0
 
 
 class TestQuordleParserCanParse:
@@ -344,7 +346,9 @@ class TestQuordleParserParse:
 
 CONNECTIONS_PERFECT = "Connections\nPuzzle #100\n🟨🟨🟨🟨\n🟩🟩🟩🟩\n🟦🟦🟦🟦\n🟪🟪🟪🟪"
 CONNECTIONS_TWO_MISSES = "Connections\nPuzzle #101\n🟨🟩🟦🟪\n🟩🟩🟩🟩\n🟨🟦🟨🟦\n🟦🟦🟦🟦\n🟨🟨🟨🟨\n🟪🟪🟪🟪"
-CONNECTIONS_FAILED = "Connections\nPuzzle #102\n🟨🟩🟦🟪\n🟩🟨🟦🟪\n🟦🟨🟩🟪\n🟪🟨🟩🟦\n🟨🟨🟨🟩"
+CONNECTIONS_FAILED = (
+    "Connections\nPuzzle #102\n🟨🟩🟦🟪\n🟩🟨🟦🟪\n🟦🟨🟩🟪\n🟪🟨🟩🟦\n🟨🟨🟨🟩"
+)
 
 
 class TestConnectionsParserCanParse:

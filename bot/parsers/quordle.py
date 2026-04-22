@@ -7,13 +7,19 @@ _HEADER_PATTERN = re.compile(r"Daily Quordle #(\d+)")
 
 # Emoji digit → attempt count; 🟥 = failed word, counts as 9
 _EMOJI_MAP = {
-    "1️⃣": 1, "2️⃣": 2, "3️⃣": 3, "4️⃣": 4, "5️⃣": 5,
-    "6️⃣": 6, "7️⃣": 7, "8️⃣": 8, "9️⃣": 9, "🟥": 9,
+    "1️⃣": 1,
+    "2️⃣": 2,
+    "3️⃣": 3,
+    "4️⃣": 4,
+    "5️⃣": 5,
+    "6️⃣": 6,
+    "7️⃣": 7,
+    "8️⃣": 8,
+    "9️⃣": 9,
+    "🟥": 9,
 }
 # Match any single emoji digit or failure square
-_EMOJI_PATTERN = re.compile(
-    r"(?:1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|6️⃣|7️⃣|8️⃣|9️⃣|🟥)"
-)
+_EMOJI_PATTERN = re.compile(r"(?:1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|6️⃣|7️⃣|8️⃣|9️⃣|🟥)")
 
 
 class QuordleParser(GameParser):
