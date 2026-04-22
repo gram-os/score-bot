@@ -357,7 +357,7 @@ class ScoreBot(discord.Client):
                     session.commit()
                     await message.add_reaction(parser.reaction)
                 else:
-                    await message.add_reaction("🎉")
+                    await message.add_reaction("⚠️")
             break
 
 
