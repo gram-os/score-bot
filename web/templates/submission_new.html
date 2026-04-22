@@ -2,13 +2,13 @@
 {% block title %}Add Submission — Score Bot Admin{% endblock %}
 {% block content %}
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-  <a href="/admin/submissions" style="color:#666; text-decoration:none; font-size:13px;">&larr; Back</a>
+  <a href="/admin/submissions" class="back-link">&larr; Back</a>
   <h2 style="margin-bottom:0;">Add Submission</h2>
 </div>
 
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
-<form method="post" action="/admin/submissions/new" style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:24px; max-width:520px;">
+<form method="post" action="/admin/submissions/new" class="card" style="padding:24px; max-width:520px;">
   <div style="display:flex; flex-direction:column; gap:14px;">
 
     <div class="filter-group">
@@ -42,7 +42,7 @@
 
     <div class="filter-group">
       <label>Raw Data (JSON)</label>
-      <textarea name="raw_data" rows="4" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; font-family:monospace;">{}</textarea>
+      <textarea name="raw_data" rows="4">{}</textarea>
     </div>
 
     <div style="display:flex; gap:8px; margin-top:4px;">

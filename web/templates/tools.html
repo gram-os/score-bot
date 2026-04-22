@@ -5,19 +5,18 @@
 {% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
 
 <style>
-  .tool-section { background:#fff; border:1px solid #ddd; border-radius:6px; padding:20px; margin-bottom:20px; }
-  .tool-section h3 { font-size:15px; margin-bottom:4px; }
-  .tool-desc { font-size:13px; color:#666; margin-bottom:14px; }
-  .tool-form-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .tool-form-row select, .tool-form-row input { padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; }
-  textarea { width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:13px; font-family:monospace; resize:vertical; }
-  .parse-results { margin-top:16px; }
-  .parse-match { border:1px solid #c3e6cb; border-radius:6px; background:#f0fff4; padding:14px; margin-bottom:10px; }
-  .parse-match-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:14px; }
-  .parse-table { width:auto; border:none; background:transparent; }
-  .parse-table th { background:transparent; border-bottom:none; font-size:12px; color:#555; padding:3px 12px 3px 0; white-space:nowrap; }
-  .parse-table td { border-bottom:none; font-size:13px; padding:3px 0; font-family:monospace; }
-  .parse-no-match { padding:16px; background:#fff3cd; border:1px solid #ffc107; border-radius:4px; color:#856404; font-size:13px; }
+  .tool-section { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-bottom: 20px; }
+  .tool-section h3 { font-size: 15px; margin-bottom: 4px; }
+  .tool-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+  .tool-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tool-form-row select, .tool-form-row input { padding: 6px 10px; border: 1px solid var(--input-border); border-radius: 4px; font-size: 13px; background: var(--surface); color: var(--text); }
+  .parse-results { margin-top: 16px; }
+  .parse-match { border: 1px solid var(--parse-match-border); border-radius: 6px; background: var(--parse-match-bg); padding: 14px; margin-bottom: 10px; }
+  .parse-match-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; }
+  .parse-table { width: auto; border: none; background: transparent; }
+  .parse-table th { background: transparent; border-bottom: none; font-size: 12px; color: var(--th-text); padding: 3px 12px 3px 0; white-space: nowrap; }
+  .parse-table td { border-bottom: none; font-size: 13px; padding: 3px 0; font-family: monospace; }
+  .parse-no-match { padding: 16px; background: var(--c-warning-bg); border: 1px solid var(--c-warning-border); border-radius: 4px; color: var(--c-warning-text); font-size: 13px; }
 </style>
 
 <div class="tool-section">
@@ -49,7 +48,7 @@
           {% endfor %}
         </table>
         {% else %}
-        <p style="color:#e74c3c;font-size:13px;">can_parse() matched but parse() returned None.</p>
+        <p class="text-danger" style="font-size:13px;">can_parse() matched but parse() returned None.</p>
         {% endif %}
       </div>
       {% endfor %}
@@ -58,14 +57,14 @@
     {% endif %}
 
     <details style="margin-top:12px;">
-      <summary style="font-size:12px;color:#999;cursor:pointer;">All parsers ({{ results | length }})</summary>
+      <summary style="font-size:12px;color:var(--text-subtle);cursor:pointer;">All parsers ({{ results | length }})</summary>
       <table style="margin-top:8px;width:auto;">
         <thead><tr><th>Parser</th><th>Matched</th></tr></thead>
         <tbody>
           {% for r in results %}
           <tr>
             <td>{{ r.game_name }}</td>
-            <td style="color:{% if r.matched %}#27ae60{% else %}#ccc{% endif %};">
+            <td style="color:{% if r.matched %}var(--c-success){% else %}var(--text-subtle){% endif %};">
               {% if r.matched %}✓{% else %}–{% endif %}
             </td>
           </tr>
