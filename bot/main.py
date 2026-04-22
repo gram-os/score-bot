@@ -397,13 +397,55 @@ class ScoreBot(discord.Client):
                         ephemeral=True,
                     )
 
+        @self.tree.command(name="help", description="How to use this bot")
+        async def help_command(interaction: discord.Interaction) -> None:
+            embed = discord.Embed(
+                title="Score Bot — How It Works",
+                description=(
+                    "Just paste your daily puzzle results in this channel and the bot "
+                    "automatically tracks your score. No commands needed to submit!"
+                ),
+                color=discord.Color.blurple(),
+            )
+            embed.add_field(
+                name="Tracked Games",
+                value=(
+                    "Wordle · Glyph · Enclose Horse · Mini Crossword · Quordle · Connections\n"
+                    "Use `/games` to see the current list."
+                ),
+                inline=False,
+            )
+            embed.add_field(
+                name="Scoring",
+                value=(
+                    "Each submission earns a base score plus a speed bonus: "
+                    "**+15** for 1st, **+10** for 2nd, **+5** for 3rd submission of the day per game."
+                ),
+                inline=False,
+            )
+            embed.add_field(
+                name="Commands",
+                value=(
+                    "`/leaderboard` — rankings by game and time period\n"
+                    "`/best` — personal bests and stats for a game\n"
+                    "`/vs` — head-to-head comparison against another player\n"
+                    "`/suggest` — suggest a new game to add\n"
+                    "`/remind` — opt in to streak reminder DMs\n"
+                    "`/games` — list currently tracked games"
+                ),
+                inline=False,
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
     async def on_ready(self) -> None:
         log.info("Logged in as %s (id=%s)", self.user, self.user.id)
-        await self.tree.sync()
         for guild in self.guilds:
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
             log.info("Synced slash commands to guild %s", guild.name)
+        # Clear global commands after guild sync so duplicates stop appearing
+        self.tree.clear_commands(guild=None)
+        await self.tree.sync()
         if not self.daily_suggestion_poll.is_running():
             self.daily_suggestion_poll.start()
         if not self._scheduler.running:

@@ -27,11 +27,15 @@
         <span style="color:#95a5a6; font-weight:600;">Disabled</span>
         {% endif %}
       </td>
-      <td>
+      <td style="display:flex; gap:6px;">
         <form method="post" action="/admin/games/{{ g.id }}/toggle">
           <button type="submit" class="btn {% if g.enabled %}toggle-on{% else %}toggle-off{% endif %}">
             {% if g.enabled %}Disable{% else %}Enable{% endif %}
           </button>
+        </form>
+        <form method="post" action="/admin/games/{{ g.id }}/recalculate"
+              onsubmit="return confirm('Recalculate all speed bonuses for {{ g.name }}?')">
+          <button type="submit" class="btn btn-secondary">Recalculate</button>
         </form>
       </td>
     </tr>

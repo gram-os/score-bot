@@ -2,7 +2,7 @@ from datetime import datetime, date
 
 from bot.parsers.wordle import WordleParser
 from bot.parsers.glyph import GlyphParser
-from bot.parsers.enclose_horse import EnclosHorseParser
+from bot.parsers.enclose_horse import EncloseHorseParser
 from bot.parsers.mini_crossword import MiniCrosswordParser
 from bot.parsers.quordle import QuordleParser
 from bot.parsers.connections import ConnectionsParser
@@ -151,19 +151,21 @@ class TestGlyphParserParse:
 
 
 # ---------------------------------------------------------------------------
-# EnclosHorseParser
+# EncloseHorseParser
 # ---------------------------------------------------------------------------
 
+HORSE_DAY_42_NO_HORSE = "https://enclose.horse Day 114\n🥉 okay 🥉 37%"
 HORSE_DAY_42 = "https://enclose.horse/ Day 42\n75.5% 🐴"
 HORSE_WITH_BONUS = "https://enclose.horse/ Day 42\n75.5% 🐴\n50.0% 🐴🐎"
 HORSE_NO_MAIN = "https://enclose.horse/ Day 42\n50.0% 🐴🐎"
 
 
-class TestEnclosHorseParserCanParse:
-    parser = EnclosHorseParser()
+class TestEncloseHorseParserCanParse:
+    parser = EncloseHorseParser()
 
     def test_valid_message(self):
         assert self.parser.can_parse(HORSE_DAY_42)
+        assert self.parser.can_parse(HORSE_DAY_42_NO_HORSE)
 
     def test_with_bonus_round(self):
         assert self.parser.can_parse(HORSE_WITH_BONUS)
@@ -175,8 +177,8 @@ class TestEnclosHorseParserCanParse:
         assert not self.parser.can_parse("check this: https://enclose.horse/ Day 42")
 
 
-class TestEnclosHorseParserParse:
-    parser = EnclosHorseParser()
+class TestEncloseHorseParserParse:
+    parser = EncloseHorseParser()
 
     def test_main_percentage_only(self):
         result = self.parser.parse(HORSE_DAY_42, USER_ID, TIMESTAMP)

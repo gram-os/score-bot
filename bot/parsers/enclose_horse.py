@@ -3,13 +3,13 @@ from datetime import datetime
 
 from .base import GameParser, ParseResult
 
-_HEADER = re.compile(r"^https://enclose\.horse/ Day (\d+)")
-_RESULT_LINE = re.compile(r"(\d+(?:\.\d+)?)%\s*(🐴\S*)")
+_HEADER = re.compile(r"^https://enclose\.horse/? Day (\d+)")
+_RESULT_LINE = re.compile(r"(\d+(?:\.\d+)?)%\s*(.*)")
 
 _HORSE = "🐴"
 
 
-class EnclosHorseParser(GameParser):
+class EncloseHorseParser(GameParser):
     @property
     def game_id(self) -> str:
         return "enclose_horse"
@@ -36,14 +36,24 @@ class EnclosHorseParser(GameParser):
         main_pct: float | None = None
         bonus_rounds: list[dict] = []
 
-        for pct_str, horse_str in _RESULT_LINE.findall(message):
+        for pct_str, label_str in _RESULT_LINE.findall(message):
             pct = float(pct_str)
-            variant = horse_str[len(_HORSE) :]
-            if not variant:
+            if _HORSE in label_str:
+                # Extract variant (anything after the first horse emoji)
+                # e.g., "🐴🐎" -> "🐎" | "🐴" -> ""
+                parts = label_str.split(_HORSE, 1)
+                variant = parts[1].strip() if len(parts) > 1 else ""
+
+                if not variant:
+                    main_pct = pct
+                else:
+                    pts = round(pct / 100 * 15)
+                    bonus_rounds.append({"variant": variant, "pct": pct, "pts": pts})
+            
+            # Case 2: "No Horse" Result (e.g., 🥉 okay 🥉)
+            # We treat this as the main_pct if it hasn't been set yet
+            elif main_pct is None:
                 main_pct = pct
-            else:
-                pts = round(pct / 100 * 15)
-                bonus_rounds.append({"variant": variant, "pct": pct, "pts": pts})
 
         if main_pct is None:
             return None
