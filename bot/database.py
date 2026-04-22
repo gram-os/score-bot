@@ -26,6 +26,7 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
     Session,
+    aliased,
 )
 from sqlalchemy.types import JSON
 
@@ -271,6 +272,168 @@ def get_leaderboard(
         )
         for i, row in enumerate(rows)
     ]
+
+
+# ---------------------------------------------------------------------------
+# Streak queries
+# ---------------------------------------------------------------------------
+
+
+def get_streak(session: Session, user_id: str, game_id: str) -> int:
+    today = datetime.now(timezone.utc).date()
+    rows = (
+        session.execute(
+            select(Submission.date)
+            .where(Submission.user_id == user_id, Submission.game_id == game_id)
+            .order_by(Submission.date.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    if not rows:
+        return 0
+
+    date_set = set(rows)
+    # Allow streak ending today or yesterday (timezone slack)
+    anchor = today if today in date_set else today - timedelta(days=1)
+    if anchor not in date_set:
+        return 0
+
+    streak = 0
+    current = anchor
+    while current in date_set:
+        streak += 1
+        current -= timedelta(days=1)
+    return streak
+
+
+def get_all_streaks(session: Session, game_id: str) -> list[tuple[str, str, int]]:
+    rows = session.execute(
+        select(Submission.user_id, Submission.username)
+        .where(Submission.game_id == game_id)
+        .distinct()
+    ).all()
+
+    results = [
+        (user_id, username, get_streak(session, user_id, game_id))
+        for user_id, username in rows
+    ]
+    results.sort(key=lambda x: x[2], reverse=True)
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Personal bests queries
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PersonalBests:
+    best_score: float
+    best_date: date
+    best_raw_data: dict
+    avg_score: float
+    count: int
+
+
+def get_personal_bests(
+    session: Session, user_id: str, game_id: str
+) -> "PersonalBests | None":
+    rows = (
+        session.execute(
+            select(Submission)
+            .where(Submission.user_id == user_id, Submission.game_id == game_id)
+            .order_by(Submission.total_score.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    if not rows:
+        return None
+
+    best = rows[0]
+    avg = sum(r.total_score for r in rows) / len(rows)
+    return PersonalBests(
+        best_score=best.total_score,
+        best_date=best.date,
+        best_raw_data=best.raw_data,
+        avg_score=avg,
+        count=len(rows),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Head-to-head queries
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class HeadToHeadResult:
+    caller_username: str
+    opponent_username: str
+    caller_total_score: float
+    opponent_total_score: float
+    caller_wins: int
+    opponent_wins: int
+    ties: int
+    overlapping_days: int
+
+
+def get_head_to_head(
+    session: Session,
+    caller_id: str,
+    opponent_id: str,
+    game_id: str | None = None,
+) -> HeadToHeadResult | None:
+    caller_sub = aliased(Submission, name="caller_sub")
+    opponent_sub = aliased(Submission, name="opponent_sub")
+
+    stmt = (
+        select(caller_sub, opponent_sub)
+        .join(
+            opponent_sub,
+            (caller_sub.date == opponent_sub.date)
+            & (caller_sub.game_id == opponent_sub.game_id),
+        )
+        .where(
+            caller_sub.user_id == caller_id,
+            opponent_sub.user_id == opponent_id,
+        )
+    )
+    if game_id is not None:
+        stmt = stmt.where(caller_sub.game_id == game_id)
+
+    rows = session.execute(stmt).all()
+    if not rows:
+        return None
+
+    caller_username = rows[0][0].username
+    opponent_username = rows[0][1].username
+    caller_wins = caller_losses = ties = 0
+    caller_total = opponent_total = 0.0
+
+    for c_sub, o_sub in rows:
+        caller_total += c_sub.total_score
+        opponent_total += o_sub.total_score
+        if c_sub.total_score > o_sub.total_score:
+            caller_wins += 1
+        elif o_sub.total_score > c_sub.total_score:
+            caller_losses += 1
+        else:
+            ties += 1
+
+    return HeadToHeadResult(
+        caller_username=caller_username,
+        opponent_username=opponent_username,
+        caller_total_score=caller_total,
+        opponent_total_score=opponent_total,
+        caller_wins=caller_wins,
+        opponent_wins=caller_losses,
+        ties=ties,
+        overlapping_days=len(rows),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -15,9 +15,13 @@ from bot.database import (
     add_suggestion,
     create_daily_poll,
     find_similar_name,
+    get_all_streaks,
     get_engine,
+    get_head_to_head,
     get_latest_unnotified_poll,
     get_leaderboard,
+    get_personal_bests,
+    get_streak,
     get_unpolled_suggestions,
     is_duplicate,
     mark_poll_notified,
@@ -49,6 +53,12 @@ GAME_CHOICES = [
     app_commands.Choice(name="Mini Crossword", value="mini_crossword"),
     app_commands.Choice(name="Quordle", value="quordle"),
     app_commands.Choice(name="Connections", value="connections"),
+]
+
+VS_GAME_CHOICES = [
+    app_commands.Choice(name="Wordle", value="wordle"),
+    app_commands.Choice(name="Glyph", value="glyph"),
+    app_commands.Choice(name="Enclose Horse", value="enclose_horse"),
 ]
 
 PERIOD_CHOICES = [
@@ -101,6 +111,20 @@ class ScoreBot(discord.Client):
                     period=period_value,
                     game_id=None if game_id == "all" else game_id,
                 )
+                if game_id == "all":
+                    enabled_games = (
+                        session.query(Game).filter(Game.enabled.is_(True)).all()
+                    )
+                    streak_map: dict[str, int] = {}
+                    for g in enabled_games:
+                        for uid, _, streak in get_all_streaks(session, g.id):
+                            if streak > streak_map.get(uid, 0):
+                                streak_map[uid] = streak
+                else:
+                    streak_map = {
+                        uid: streak
+                        for uid, _, streak in get_all_streaks(session, game_id)
+                    }
 
             game_label = game.name if game else "All Games"
             period_label = PERIOD_LABELS[period_value]
@@ -114,8 +138,10 @@ class ScoreBot(discord.Client):
                 lines = []
                 for row in rows[:15]:
                     medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(row.rank, f"`#{row.rank}`")
+                    streak = streak_map.get(row.user_id, 0)
+                    streak_str = f" 🔥{streak}" if streak >= 1 else ""
                     lines.append(
-                        f"{medal} **{row.username}** — {row.total_score:.0f} pts"
+                        f"{medal} **{row.username}**{streak_str} — {row.total_score:.0f} pts"
                         f" ({row.submission_count} sub{'s' if row.submission_count != 1 else ''})"
                     )
                 embed.description = "\n".join(lines)
@@ -186,6 +212,145 @@ class ScoreBot(discord.Client):
                 "appear in tomorrow's poll!",
                 ephemeral=True,
             )
+
+        @self.tree.command(
+            name="vs", description="Head-to-head comparison against another player"
+        )
+        @app_commands.describe(
+            opponent="The player to compare against",
+            game="Which game to compare (default: all games)",
+        )
+        @app_commands.choices(game=VS_GAME_CHOICES)
+        async def vs(
+            interaction: discord.Interaction,
+            opponent: discord.Member,
+            game: app_commands.Choice[str] = None,
+        ) -> None:
+            caller_id = str(interaction.user.id)
+            opponent_id = str(opponent.id)
+
+            if caller_id == opponent_id:
+                await interaction.response.send_message(
+                    "You can't challenge yourself!", ephemeral=True
+                )
+                return
+
+            game_id = game.value if game else None
+            game_label = game.name if game else "All Games"
+
+            with self.Session() as session:
+                result = get_head_to_head(session, caller_id, opponent_id, game_id)
+
+            if result is None:
+                await interaction.response.send_message(
+                    f"No overlapping submissions found between you and "
+                    f"**{opponent.display_name}**"
+                    + (f" in **{game_label}**" if game else "")
+                    + ". Play some games together first!",
+                )
+                return
+
+            overlapping = result.overlapping_days
+            caller_win_rate = (
+                result.caller_wins / overlapping * 100 if overlapping else 0
+            )
+            opponent_win_rate = (
+                result.opponent_wins / overlapping * 100 if overlapping else 0
+            )
+
+            embed = discord.Embed(
+                title=f"Head-to-Head — {game_label}",
+                color=discord.Color.blurple(),
+            )
+            embed.add_field(
+                name="Player",
+                value=f"{result.caller_username}\n{result.opponent_username}",
+                inline=True,
+            )
+            embed.add_field(
+                name="Total Score",
+                value=(
+                    f"{result.caller_total_score:.0f}\n"
+                    f"{result.opponent_total_score:.0f}"
+                ),
+                inline=True,
+            )
+            embed.add_field(
+                name="Win Rate",
+                value=(
+                    f"{caller_win_rate:.0f}% ({result.caller_wins}W/"
+                    f"{result.opponent_wins}L/{result.ties}T)\n"
+                    f"{opponent_win_rate:.0f}% ({result.opponent_wins}W/"
+                    f"{result.caller_wins}L/{result.ties}T)"
+                ),
+                inline=True,
+            )
+            embed.set_footer(text=f"Based on {overlapping} overlapping day(s)")
+
+            await interaction.response.send_message(embed=embed)
+
+        @self.tree.command(name="best", description="Show personal bests for a game")
+        @app_commands.describe(
+            game="Which game to look up",
+            user="Player to look up (defaults to you)",
+        )
+        async def best(
+            interaction: discord.Interaction,
+            game: str,
+            user: discord.Member = None,
+        ) -> None:
+            target = user or interaction.user
+            target_id = str(target.id)
+
+            parser = self.registry.get_parser(game)
+            game_name = parser.game_name if parser else game
+
+            with self.Session() as session:
+                bests = get_personal_bests(session, target_id, game)
+                streak = get_streak(session, target_id, game) if bests else 0
+
+            if bests is None:
+                await interaction.response.send_message(
+                    f"**{target.display_name}** hasn't submitted any **{game_name}** scores yet!"
+                )
+                return
+
+            puzzle_num = bests.best_raw_data.get("puzzle_number")
+            best_detail = f"{bests.best_score:.0f} pts"
+            if puzzle_num is not None:
+                best_detail += f" (puzzle #{puzzle_num}, {bests.best_date})"
+            else:
+                best_detail += f" ({bests.best_date})"
+
+            embed = discord.Embed(
+                title=f"{game_name} — {target.display_name}'s Bests",
+                color=discord.Color.green(),
+            )
+            embed.add_field(name="Best Score", value=best_detail, inline=False)
+            embed.add_field(
+                name="Average Score", value=f"{bests.avg_score:.1f} pts", inline=True
+            )
+            embed.add_field(
+                name="Total Submissions", value=str(bests.count), inline=True
+            )
+            if streak >= 1:
+                embed.add_field(
+                    name="Current Streak", value=f"🔥 {streak} days", inline=True
+                )
+
+            await interaction.response.send_message(embed=embed)
+
+        @best.autocomplete("game")
+        async def best_game_autocomplete(
+            interaction: discord.Interaction,
+            current: str,
+        ) -> list[app_commands.Choice[str]]:
+            return [
+                app_commands.Choice(name=p.game_name, value=p.game_id)
+                for p in self.registry.all_parsers()
+                if current.lower() in p.game_name.lower()
+                or current.lower() in p.game_id.lower()
+            ]
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s (id=%s)", self.user, self.user.id)
@@ -356,9 +521,16 @@ class ScoreBot(discord.Client):
                     session, result.user_id, result.game_id, result.date
                 )
                 if not duplicate:
+                    game_name = game.name
                     record_submission(session, result, username)
                     session.commit()
+                    streak = get_streak(session, result.user_id, result.game_id)
                     await message.add_reaction(parser.reaction)
+                    if streak >= 3:
+                        await message.channel.send(
+                            f"🔥 {username} is on a **{streak}-day streak** in {game_name}!",
+                            reference=message,
+                        )
                 else:
                     await message.add_reaction("⚠️")
             break
