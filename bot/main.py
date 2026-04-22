@@ -46,6 +46,7 @@ GAME_CHOICES = [
     app_commands.Choice(name="Wordle", value="wordle"),
     app_commands.Choice(name="Glyph", value="glyph"),
     app_commands.Choice(name="Enclose Horse", value="enclose_horse"),
+    app_commands.Choice(name="Mini Crossword", value="mini_crossword"),
 ]
 
 PERIOD_CHOICES = [
