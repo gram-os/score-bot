@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Users — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Users</h2>
+
+{% if users %}
+<div style="margin-bottom:12px;">
+  <input type="text" id="user-filter" placeholder="Filter by username…"
+         style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;width:240px;">
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Username</th>
+      <th>Total Score</th>
+      <th>Submissions</th>
+      <th>Games</th>
+      <th>Last Active</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ u.username }}</strong></td>
+      <td>{{ u.total_score | int }}</td>
+      <td>{{ u.submission_count }}</td>
+      <td>{{ u.game_count }}</td>
+      <td>{{ u.last_date or '—' }}</td>
+      <td>
+        <a href="/admin/users/{{ u.user_id }}" class="btn btn-secondary" style="text-decoration:none;">View</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No users found.</div>
+{% endif %}
+
+<script>
+document.getElementById('user-filter')?.addEventListener('input', function () {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('tbody tr').forEach(row => {
+    const username = (row.cells[1]?.innerText ?? '').toLowerCase();
+    row.style.display = username.includes(q) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}
