@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, date, timedelta, timezone
 from typing import Literal
 
+from rapidfuzz import fuzz
 from sqlalchemy import (
     Boolean,
     Date,
@@ -15,9 +16,17 @@ from sqlalchemy import (
     create_engine,
     func,
     select,
+    update,
 )
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    selectinload,
+    Session,
+)
 from sqlalchemy.types import JSON
 
 
@@ -59,6 +68,38 @@ class Submission(Base):
     )
 
     game: Mapped["Game"] = relationship("Game", back_populates="submissions")
+
+
+class DailyPoll(Base):
+    __tablename__ = "daily_polls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    message_id: Mapped[str] = mapped_column(String, nullable=False)
+    is_yes_no: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    notified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    suggestions: Mapped[list["GameSuggestion"]] = relationship(
+        "GameSuggestion", back_populates="poll"
+    )
+
+
+class GameSuggestion(Base):
+    __tablename__ = "game_suggestions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    game_name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    suggested_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    poll_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("daily_polls.id"), nullable=True
+    )
+
+    poll: Mapped["DailyPoll | None"] = relationship(
+        "DailyPoll", back_populates="suggestions"
+    )
 
 
 def get_engine(db_path: str | None = None):
@@ -230,3 +271,84 @@ def get_leaderboard(
         )
         for i, row in enumerate(rows)
     ]
+
+
+# ---------------------------------------------------------------------------
+# Game suggestion operations
+# ---------------------------------------------------------------------------
+
+_FUZZY_THRESHOLD = 85
+
+
+def find_similar_name(name: str, candidates: list[str]) -> str | None:
+    """Return the first candidate with fuzzy similarity >= threshold, or None."""
+    name_lower = name.lower()
+    for candidate in candidates:
+        if fuzz.ratio(name_lower, candidate.lower()) >= _FUZZY_THRESHOLD:
+            return candidate
+    return None
+
+
+def add_suggestion(
+    session: Session,
+    user_id: str,
+    username: str,
+    game_name: str,
+    description: str | None = None,
+) -> GameSuggestion:
+    suggestion = GameSuggestion(
+        user_id=user_id,
+        username=username,
+        game_name=game_name,
+        description=description,
+        suggested_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    session.add(suggestion)
+    session.flush()
+    return suggestion
+
+
+def get_unpolled_suggestions(session: Session) -> list[GameSuggestion]:
+    return list(
+        session.execute(
+            select(GameSuggestion).where(GameSuggestion.poll_id.is_(None))
+        ).scalars()
+    )
+
+
+def create_daily_poll(
+    session: Session,
+    message_id: str,
+    is_yes_no: bool,
+    suggestion_ids: list[int],
+) -> DailyPoll:
+    poll = DailyPoll(
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        message_id=message_id,
+        is_yes_no=is_yes_no,
+        notified=False,
+    )
+    session.add(poll)
+    session.flush()
+    session.execute(
+        update(GameSuggestion)
+        .where(GameSuggestion.id.in_(suggestion_ids))
+        .values(poll_id=poll.id)
+    )
+    return poll
+
+
+def get_latest_unnotified_poll(session: Session) -> DailyPoll | None:
+    return session.scalar(
+        select(DailyPoll)
+        .options(selectinload(DailyPoll.suggestions))
+        .where(DailyPoll.notified.is_(False))
+        .order_by(DailyPoll.created_at.desc())
+        .limit(1)
+    )
+
+
+def mark_poll_notified(session: Session, poll_id: int) -> None:
+    poll = session.get(DailyPoll, poll_id)
+    if poll:
+        poll.notified = True

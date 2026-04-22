@@ -1,4 +1,4 @@
-.PHONY: help setup build up down logs migrate shell clean test test-unit test-integration
+.PHONY: help setup build up down logs migrate shell clean check test test-unit test-integration
 
 help:
 	@echo "Usage: make <target>"
@@ -11,6 +11,7 @@ help:
 	@echo "  migrate  Run database migrations only"
 	@echo "  shell    Open a shell inside the bot container"
 	@echo "  clean    Remove containers, volumes, and the data directory"
+	@echo "  check    Run black, flake8, and pytest (run before committing)"
 
 setup:
 	@if [ -f .env ]; then \
@@ -53,6 +54,11 @@ shell:
 clean:
 	docker compose down -v
 	rm -rf data
+
+check:
+	black .
+	flake8 .
+	pytest
 
 test: test-unit test-integration
 
