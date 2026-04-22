@@ -71,6 +71,13 @@ class Submission(Base):
     game: Mapped["Game"] = relationship("Game", back_populates="submissions")
 
 
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    remind_streak_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
 class DailyPoll(Base):
     __tablename__ = "daily_polls"
 
@@ -308,6 +315,61 @@ def get_streak(session: Session, user_id: str, game_id: str) -> int:
     return streak
 
 
+@dataclass
+class GameDigestData:
+    game_id: str
+    game_name: str
+    winner_username: str | None
+    winner_score: float
+    participant_count: int
+    top_streak: int
+
+
+def get_yesterday_digest(session: Session) -> list["GameDigestData"]:
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date()
+
+    games = session.execute(select(Game).where(Game.enabled.is_(True))).scalars().all()
+
+    results = []
+    for game in games:
+        subs = (
+            session.execute(
+                select(Submission)
+                .where(Submission.game_id == game.id, Submission.date == yesterday)
+                .order_by(Submission.total_score.desc())
+            )
+            .scalars()
+            .all()
+        )
+
+        if not subs:
+            results.append(
+                GameDigestData(
+                    game_id=game.id,
+                    game_name=game.name,
+                    winner_username=None,
+                    winner_score=0.0,
+                    participant_count=0,
+                    top_streak=0,
+                )
+            )
+            continue
+
+        top_streak = max(get_streak(session, sub.user_id, game.id) for sub in subs)
+        results.append(
+            GameDigestData(
+                game_id=game.id,
+                game_name=game.name,
+                winner_username=subs[0].username,
+                winner_score=subs[0].total_score,
+                participant_count=len(subs),
+                top_streak=top_streak,
+            )
+        )
+
+    return results
+
+
 def get_all_streaks(session: Session, game_id: str) -> list[tuple[str, str, int]]:
     rows = session.execute(
         select(Submission.user_id, Submission.username)
@@ -515,3 +577,33 @@ def mark_poll_notified(session: Session, poll_id: int) -> None:
     poll = session.get(DailyPoll, poll_id)
     if poll:
         poll.notified = True
+
+
+# ---------------------------------------------------------------------------
+# User preference operations
+# ---------------------------------------------------------------------------
+
+
+def get_opted_in_preferences(session: Session) -> list["UserPreference"]:
+    return list(
+        session.execute(
+            select(UserPreference).where(UserPreference.remind_streak_days > 0)
+        ).scalars()
+    )
+
+
+def get_preference(session: Session, user_id: str) -> "UserPreference | None":
+    return session.get(UserPreference, user_id)
+
+
+def set_preference(
+    session: Session, user_id: str, remind_streak_days: int
+) -> "UserPreference":
+    pref = session.get(UserPreference, user_id)
+    if pref is None:
+        pref = UserPreference(user_id=user_id, remind_streak_days=remind_streak_days)
+        session.add(pref)
+    else:
+        pref.remind_streak_days = remind_streak_days
+    session.flush()
+    return pref
