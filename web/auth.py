@@ -1,11 +1,11 @@
 import json
 import os
-from datetime import date as date_type
+from datetime import date as date_type, timedelta
 
 import httpx
 from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -292,6 +292,62 @@ async def game_toggle(
     finally:
         db.close()
     return RedirectResponse(url="/admin/games", status_code=303)
+
+
+@admin_router.get("/stats/submissions")
+async def stats_submissions(
+    days: int = Query(default=30),
+    session: dict = Depends(require_admin),
+):
+    if days not in (7, 30, 90):
+        days = 30
+    cutoff = date_type.today() - timedelta(days=days)
+
+    db = _db_session()
+    try:
+        rows = db.execute(
+            select(
+                Submission.date,
+                Submission.game_id,
+                Game.name.label("game_name"),
+                func.count(Submission.id).label("count"),
+            )
+            .join(Game, Submission.game_id == Game.id)
+            .where(Submission.date >= cutoff)
+            .group_by(Submission.game_id, Game.name, Submission.date)
+            .order_by(Submission.date.asc(), Game.name.asc())
+        ).all()
+    finally:
+        db.close()
+
+    return JSONResponse(
+        [
+            {
+                "date": str(row.date),
+                "game_id": row.game_id,
+                "game": row.game_name,
+                "count": row.count,
+            }
+            for row in rows
+        ]
+    )
+
+
+@admin_router.get("/stats")
+async def stats_view(
+    request: Request,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        games = db.execute(select(Game).order_by(Game.name)).scalars().all()
+    finally:
+        db.close()
+    return templates.TemplateResponse(
+        request,
+        "stats.html",
+        {"active": "stats", "games": games},
+    )
 
 
 @admin_router.get("/leaderboard")

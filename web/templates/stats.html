@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Stats — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Submission Timeline</h2>
+
+<div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;">
+  <span style="font-size:13px;color:#666;margin-right:4px;">Window:</span>
+  <button class="btn btn-secondary day-btn" data-days="7">7 days</button>
+  <button class="btn btn-secondary day-btn" data-days="30">30 days</button>
+  <button class="btn btn-secondary day-btn" data-days="90">90 days</button>
+</div>
+
+<div style="background:#fff;border:1px solid #ddd;border-radius:6px;padding:16px;">
+  <canvas id="submissionsChart" height="80"></canvas>
+  <p id="emptyMsg" style="display:none;text-align:center;color:#999;padding:32px 0;font-size:13px;">No submissions in this period.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function () {
+  const COLORS = [
+    '#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad',
+    '#16a085','#d35400','#2980b9','#c0392b','#1abc9c',
+  ];
+
+  let chart = null;
+  let activeDays = 30;
+
+  function setActiveBtn(days) {
+    document.querySelectorAll('.day-btn').forEach(btn => {
+      const isActive = parseInt(btn.dataset.days) === days;
+      btn.classList.toggle('btn-primary', isActive);
+      btn.classList.toggle('btn-secondary', !isActive);
+    });
+  }
+
+  async function fetchAndRender(days) {
+    activeDays = days;
+    setActiveBtn(days);
+
+    let data;
+    try {
+      const res = await fetch(`/admin/stats/submissions?days=${days}`);
+      data = await res.json();
+    } catch (e) {
+      console.error('Failed to fetch stats:', e);
+      return;
+    }
+
+    const emptyMsg = document.getElementById('emptyMsg');
+    const canvas = document.getElementById('submissionsChart');
+
+    if (!data.length) {
+      canvas.style.display = 'none';
+      emptyMsg.style.display = 'block';
+      if (chart) { chart.destroy(); chart = null; }
+      return;
+    }
+    canvas.style.display = 'block';
+    emptyMsg.style.display = 'none';
+
+    // Pivot: collect all dates and per-game counts
+    const gameMap = {};
+    const dateSet = new Set();
+    for (const row of data) {
+      dateSet.add(row.date);
+      if (!gameMap[row.game]) gameMap[row.game] = {};
+      gameMap[row.game][row.date] = row.count;
+    }
+    const dates = Array.from(dateSet).sort();
+    const games = Object.keys(gameMap).sort();
+
+    const datasets = games.map((game, i) => ({
+      label: game,
+      data: dates.map(d => gameMap[game][d] ?? 0),
+      borderColor: COLORS[i % COLORS.length],
+      backgroundColor: COLORS[i % COLORS.length] + '22',
+      tension: 0.3,
+      pointRadius: 3,
+      fill: false,
+    }));
+
+    if (chart) {
+      chart.data.labels = dates;
+      chart.data.datasets = datasets;
+      chart.update();
+    } else {
+      const ctx = canvas.getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: dates, datasets },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+          },
+          scales: {
+            x: { title: { display: true, text: 'Date' } },
+            y: {
+              title: { display: true, text: 'Submissions' },
+              beginAtZero: true,
+              ticks: { precision: 0 },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => fetchAndRender(parseInt(btn.dataset.days)));
+  });
+
+  fetchAndRender(30);
+})();
+</script>
+{% endblock %}
