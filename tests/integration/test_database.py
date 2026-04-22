@@ -5,7 +5,9 @@ from bot.database import (
     Submission,
     add_submission_manual,
     delete_submission,
+    get_all_streaks,
     get_leaderboard,
+    get_streak,
     is_duplicate,
     record_submission,
 )
@@ -249,3 +251,91 @@ class TestGetLeaderboard:
     def test_empty_db_returns_empty_list(self, session, wordle_game):
         rows = get_leaderboard(session, "alltime")
         assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# get_streak / get_all_streaks
+# ---------------------------------------------------------------------------
+
+
+def _add(session, user_id, username, days_ago, game_id="wordle"):
+    target_date = datetime.now(timezone.utc).date() - timedelta(days=days_ago)
+    sub = Submission(
+        user_id=user_id,
+        username=username,
+        game_id=game_id,
+        date=target_date,
+        base_score=75.0,
+        speed_bonus=0,
+        total_score=75.0,
+        submission_rank=1,
+        raw_data={},
+        submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    session.add(sub)
+    session.flush()
+    return sub
+
+
+class TestGetStreak:
+    def test_zero_when_no_submissions(self, session, wordle_game):
+        assert get_streak(session, "user1", "wordle") == 0
+
+    def test_single_day_streak_today(self, session, wordle_game):
+        _add(session, "user1", "Alice", days_ago=0)
+        assert get_streak(session, "user1", "wordle") == 1
+
+    def test_single_day_streak_yesterday(self, session, wordle_game):
+        _add(session, "user1", "Alice", days_ago=1)
+        assert get_streak(session, "user1", "wordle") == 1
+
+    def test_multi_day_streak(self, session, wordle_game):
+        for d in range(4):
+            _add(session, "user1", "Alice", days_ago=d)
+        assert get_streak(session, "user1", "wordle") == 4
+
+    def test_broken_streak_resets(self, session, wordle_game):
+        # days 0 and 1 present, day 2 missing, days 3-5 present
+        for d in [0, 1, 3, 4, 5]:
+            _add(session, "user1", "Alice", days_ago=d)
+        assert get_streak(session, "user1", "wordle") == 2
+
+    def test_streak_ended_two_days_ago_returns_zero(self, session, wordle_game):
+        # Most recent submission is 2 days ago — outside timezone slack window
+        _add(session, "user1", "Alice", days_ago=2)
+        assert get_streak(session, "user1", "wordle") == 0
+
+    def test_different_game_not_counted(self, session, wordle_game):
+        other_game = Game(
+            id="connections",
+            name="Connections",
+            enabled=True,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        session.add(other_game)
+        session.flush()
+        _add(session, "user1", "Alice", days_ago=0, game_id="connections")
+        assert get_streak(session, "user1", "wordle") == 0
+
+
+class TestGetAllStreaks:
+    def test_returns_all_users_sorted_descending(self, session, wordle_game):
+        # Alice: 3-day streak, Bob: 1-day streak
+        for d in range(3):
+            _add(session, "user1", "Alice", days_ago=d)
+        _add(session, "user2", "Bob", days_ago=0)
+
+        results = get_all_streaks(session, "wordle")
+        assert len(results) == 2
+        assert results[0] == ("user1", "Alice", 3)
+        assert results[1] == ("user2", "Bob", 1)
+
+    def test_empty_when_no_submissions(self, session, wordle_game):
+        assert get_all_streaks(session, "wordle") == []
+
+    def test_zero_streak_user_included(self, session, wordle_game):
+        # User submitted but streak has lapsed (2 days ago)
+        _add(session, "user1", "Alice", days_ago=2)
+        results = get_all_streaks(session, "wordle")
+        assert len(results) == 1
+        assert results[0][2] == 0
