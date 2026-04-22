@@ -187,6 +187,12 @@ class TestEncloseHorseParserParse:
         assert result.raw_data["main_pct"] == 75.5
         assert result.raw_data["bonus_rounds"] == []
 
+        result = self.parser.parse(HORSE_DAY_42_NO_HORSE, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 37
+        assert result.raw_data["main_pct"] == 37
+        assert result.raw_data["bonus_rounds"] == []
+
     def test_day_number_captured(self):
         result = self.parser.parse(HORSE_DAY_42, USER_ID, TIMESTAMP)
         assert result.raw_data["day"] == 42
