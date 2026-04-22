@@ -48,8 +48,6 @@ ADMIN_DISCORD_IDS: list[int] = [
     for uid in os.environ.get("ADMIN_DISCORD_IDS", "").split(",")
     if uid.strip()
 ]
-_POLL_HOUR = int(os.environ.get("POLL_HOUR", "9"))
-_POLL_TIME = datetime.time(hour=_POLL_HOUR, tzinfo=datetime.timezone.utc)
 
 _DIGEST_TIME = os.environ.get("DIGEST_TIME", "09:00")
 _digest_hour, _digest_minute = (int(x) for x in _DIGEST_TIME.split(":"))
@@ -476,7 +474,7 @@ class ScoreBot(discord.Client):
             self._scheduler.shutdown(wait=False)
         await super().close()
 
-    @tasks.loop(time=_POLL_TIME)
+    @tasks.loop(hours=4)
     async def daily_suggestion_poll(self) -> None:
         channel = self.get_channel(DISCORD_CHANNEL_ID)
         if channel is None:
@@ -515,14 +513,14 @@ class ScoreBot(discord.Client):
                 game = suggestions[0].game_name
                 poll = discord.Poll(
                     question=f"Should we add {game} to the bot?",
-                    duration=datetime.timedelta(hours=23),
+                    duration=datetime.timedelta(hours=4),
                 )
                 poll.add_answer(text="Yes", emoji="✅")
                 poll.add_answer(text="No", emoji="❌")
             else:
                 poll = discord.Poll(
                     question="Which game should we add to the bot next?",
-                    duration=datetime.timedelta(hours=23),
+                    duration=datetime.timedelta(hours=4),
                 )
                 for s in suggestions:
                     poll.add_answer(text=s.game_name)

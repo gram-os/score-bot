@@ -10,6 +10,7 @@ from bot.database import (
     get_streak,
     is_duplicate,
     record_submission,
+    upsert_user,
 )
 from bot.parsers.base import ParseResult
 
@@ -259,6 +260,7 @@ class TestGetLeaderboard:
 
 
 def _add(session, user_id, username, days_ago, game_id="wordle"):
+    upsert_user(session, user_id, username)
     target_date = datetime.now(timezone.utc).date() - timedelta(days=days_ago)
     sub = Submission(
         user_id=user_id,
