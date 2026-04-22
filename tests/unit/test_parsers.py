@@ -3,6 +3,9 @@ from datetime import datetime, date
 from bot.parsers.wordle import WordleParser
 from bot.parsers.glyph import GlyphParser
 from bot.parsers.enclose_horse import EnclosHorseParser
+from bot.parsers.mini_crossword import MiniCrosswordParser
+from bot.parsers.quordle import QuordleParser
+from bot.parsers.connections import ConnectionsParser
 
 USER_ID = "123456789"
 TIMESTAMP = datetime(2024, 1, 15, 12, 0, 0)
@@ -206,4 +209,197 @@ class TestEnclosHorseParserParse:
         assert result.game_id == "enclose_horse"
 
     def test_returns_none_for_non_matching(self):
+        assert self.parser.parse("unrelated message", USER_ID, TIMESTAMP) is None
+
+
+# ---------------------------------------------------------------------------
+# MiniCrosswordParser
+# ---------------------------------------------------------------------------
+
+
+class TestMiniCrosswordParserCanParse:
+    parser = MiniCrosswordParser()
+
+    def test_valid_message(self):
+        assert self.parser.can_parse("I solved the Mini in 1:23!")
+
+    def test_valid_without_exclamation(self):
+        assert self.parser.can_parse("I solved the Mini in 0:30")
+
+    def test_rejects_wordle(self):
+        assert not self.parser.can_parse("Wordle 1,337 3/6")
+
+    def test_rejects_unrelated(self):
+        assert not self.parser.can_parse("I solved the crossword")
+
+
+class TestMiniCrosswordParserParse:
+    parser = MiniCrosswordParser()
+
+    def test_fast_time(self):
+        # 0:30 → total_seconds=30 → base_score=70
+        result = self.parser.parse("I solved the Mini in 0:30!", USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 70.0
+        assert result.raw_data["minutes"] == 0
+        assert result.raw_data["seconds"] == 30
+        assert result.raw_data["total_seconds"] == 30
+
+    def test_slow_time_clamped_to_zero(self):
+        # 1:45 → total_seconds=105 → max(0, 100-105)=0
+        result = self.parser.parse("I solved the Mini in 1:45!", USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 0.0
+        assert result.raw_data["total_seconds"] == 105
+
+    def test_exactly_100_seconds(self):
+        # 1:40 → total_seconds=100 → base_score=0
+        result = self.parser.parse("I solved the Mini in 1:40!", USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 0.0
+
+    def test_game_id(self):
+        result = self.parser.parse("I solved the Mini in 1:00!", USER_ID, TIMESTAMP)
+        assert result.game_id == "mini_crossword"
+
+    def test_date_from_timestamp(self):
+        result = self.parser.parse("I solved the Mini in 1:00!", USER_ID, TIMESTAMP)
+        assert result.date == TIMESTAMP.date()
+
+    def test_returns_none_for_unrecognised(self):
+        assert self.parser.parse("unrelated message", USER_ID, TIMESTAMP) is None
+
+
+# ---------------------------------------------------------------------------
+# QuordleParser
+# ---------------------------------------------------------------------------
+
+QUORDLE_LOW = "Daily Quordle #100\n2️⃣1️⃣\n1️⃣2️⃣"  # total=6 → score=70
+QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"  # total=35 → clamped to 0
+QUORDLE_FAIL = (
+    "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"  # 9+2+3+4=18 → score=0 (clamped); failed=True
+)
+QUORDLE_MID = "Daily Quordle #400\n4️⃣5️⃣\n6️⃣7️⃣"  # total=22 → max(0,100-180)=0
+
+
+class TestQuordleParserCanParse:
+    parser = QuordleParser()
+
+    def test_detects_valid_header(self):
+        assert self.parser.can_parse("Daily Quordle #123\n4️⃣5️⃣\n6️⃣7️⃣")
+
+    def test_rejects_unrelated(self):
+        assert not self.parser.can_parse("unrelated message")
+
+    def test_rejects_wordle(self):
+        assert not self.parser.can_parse("Wordle 1,337 3/6")
+
+
+class TestQuordleParserParse:
+    parser = QuordleParser()
+
+    def test_low_attempts_high_score(self):
+        # total=6 → max(0, 100 - (6-4)*10) = 80
+        result = self.parser.parse(QUORDLE_LOW, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 80.0
+        assert result.raw_data["attempts"] == [2, 1, 1, 2]
+        assert result.raw_data["total_attempts"] == 6
+        assert result.raw_data["failed"] is False
+
+    def test_high_attempts_clamped_to_zero(self):
+        # total=35 → clamped to 0
+        result = self.parser.parse(QUORDLE_HIGH, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 0.0
+
+    def test_failed_word_counts_as_nine(self):
+        # 🟥 → 9; total=9+2+3+4=18 → max(0,100-140)=0; failed=True
+        result = self.parser.parse(QUORDLE_FAIL, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.raw_data["attempts"][0] == 9
+        assert result.raw_data["failed"] is True
+        assert result.base_score == 0.0
+
+    def test_puzzle_number_extracted(self):
+        result = self.parser.parse(QUORDLE_MID, USER_ID, TIMESTAMP)
+        assert result.raw_data["puzzle_number"] == 400
+
+    def test_game_id(self):
+        result = self.parser.parse(QUORDLE_LOW, USER_ID, TIMESTAMP)
+        assert result.game_id == "quordle"
+
+    def test_date_from_timestamp(self):
+        result = self.parser.parse(QUORDLE_LOW, USER_ID, TIMESTAMP)
+        assert result.date == TIMESTAMP.date()
+
+    def test_returns_none_for_unrecognised(self):
+        assert self.parser.parse("unrelated message", USER_ID, TIMESTAMP) is None
+
+    def test_returns_none_for_wrong_emoji_count(self):
+        assert self.parser.parse("Daily Quordle #1\n1️⃣2️⃣", USER_ID, TIMESTAMP) is None
+
+
+# ---------------------------------------------------------------------------
+# ConnectionsParser
+# ---------------------------------------------------------------------------
+
+CONNECTIONS_PERFECT = "Connections\nPuzzle #100\n🟨🟨🟨🟨\n🟩🟩🟩🟩\n🟦🟦🟦🟦\n🟪🟪🟪🟪"
+CONNECTIONS_TWO_MISSES = "Connections\nPuzzle #101\n🟨🟩🟦🟪\n🟩🟩🟩🟩\n🟨🟦🟨🟦\n🟦🟦🟦🟦\n🟨🟨🟨🟨\n🟪🟪🟪🟪"
+CONNECTIONS_FAILED = (
+    "Connections\nPuzzle #102\n🟨🟩🟦🟪\n🟩🟨🟦🟪\n🟦🟨🟩🟪\n🟪🟨🟩🟦\n🟨🟨🟨🟩"
+)
+
+
+class TestConnectionsParserCanParse:
+    parser = ConnectionsParser()
+
+    def test_valid_message(self):
+        assert self.parser.can_parse(CONNECTIONS_PERFECT)
+
+    def test_rejects_unrelated(self):
+        assert not self.parser.can_parse("unrelated message")
+
+    def test_rejects_wordle(self):
+        assert not self.parser.can_parse("Wordle 1,337 3/6")
+
+    def test_rejects_partial_header(self):
+        assert not self.parser.can_parse("Connections")
+
+
+class TestConnectionsParserParse:
+    parser = ConnectionsParser()
+
+    def test_perfect_solve_zero_misses(self):
+        # 0 misses → 100 pts
+        result = self.parser.parse(CONNECTIONS_PERFECT, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 100.0
+        assert result.raw_data["misses"] == 0
+        assert result.raw_data["puzzle_number"] == 100
+        assert result.raw_data["rows_played"] == 4
+
+    def test_two_misses(self):
+        # 2 non-pure rows → 100 - 2*20 = 60 pts
+        result = self.parser.parse(CONNECTIONS_TWO_MISSES, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 60.0
+        assert result.raw_data["misses"] == 2
+
+    def test_failed_attempt_clamped_to_zero(self):
+        # 5 non-pure rows → max(0, 100 - 100) = 0 pts
+        result = self.parser.parse(CONNECTIONS_FAILED, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 0.0
+        assert result.raw_data["misses"] == 5
+
+    def test_game_id(self):
+        result = self.parser.parse(CONNECTIONS_PERFECT, USER_ID, TIMESTAMP)
+        assert result.game_id == "connections"
+
+    def test_date_from_timestamp(self):
+        result = self.parser.parse(CONNECTIONS_PERFECT, USER_ID, TIMESTAMP)
+        assert result.date == TIMESTAMP.date()
+
+    def test_returns_none_for_unrecognised(self):
         assert self.parser.parse("unrelated message", USER_ID, TIMESTAMP) is None

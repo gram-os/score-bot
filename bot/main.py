@@ -46,6 +46,9 @@ GAME_CHOICES = [
     app_commands.Choice(name="Wordle", value="wordle"),
     app_commands.Choice(name="Glyph", value="glyph"),
     app_commands.Choice(name="Enclose Horse", value="enclose_horse"),
+    app_commands.Choice(name="Mini Crossword", value="mini_crossword"),
+    app_commands.Choice(name="Quordle", value="quordle"),
+    app_commands.Choice(name="Connections", value="connections"),
 ]
 
 PERIOD_CHOICES = [
@@ -357,7 +360,7 @@ class ScoreBot(discord.Client):
                     session.commit()
                     await message.add_reaction(parser.reaction)
                 else:
-                    await message.add_reaction("🎉")
+                    await message.add_reaction("⚠️")
             break
 
 
