@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Live — Score Bot Admin{% endblock %}
+{% block content %}
+<style>
+  .live-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .live-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--c-success); animation: pulse 2s infinite; flex-shrink: 0; }
+  .pulse.paused { background: var(--c-disabled); animation: none; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+  .new-row { animation: flash-in .6s ease-out; }
+  @keyframes flash-in {
+    0%   { background: color-mix(in srgb, var(--c-success) 20%, transparent); }
+    100% { background: transparent; }
+  }
+  .date-label { font-size: 12px; color: var(--text-subtle); font-weight: 500; }
+  .pause-btn { font-size: 12px; }
+  .section-title { font-size: 15px; font-weight: 600; margin: 28px 0 12px; }
+  .badge-polled { background: var(--c-warning-bg); color: var(--c-warning-text); border: 1px solid var(--c-warning-border); }
+  .badge-pending { background: var(--c-secondary-bg); color: var(--c-secondary-text); }
+</style>
+
+<div class="live-header">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <h2 style="margin-bottom:0;">Live Feed</h2>
+    <span class="date-label">{{ today }}</span>
+  </div>
+  <div class="live-status">
+    <div class="pulse" id="pulse"></div>
+    <span id="status-text">Listening…</span>
+    <button class="btn btn-secondary pause-btn" id="pauseBtn">Pause</button>
+  </div>
+</div>
+
+<!-- Submissions -->
+<div class="section-title">Submissions</div>
+{% if submissions %}
+<table id="sub-table">
+{% else %}
+<div class="empty" id="sub-empty">No submissions yet today.</div>
+<table id="sub-table" style="display:none;">
+{% endif %}
+  <thead>
+    <tr>
+      <th>#</th><th>Time</th><th>Username</th><th>Game</th>
+      <th>Base</th><th>+Speed</th><th>Total</th><th>Rank</th>
+    </tr>
+  </thead>
+  <tbody id="sub-body">
+    {% for s in submissions %}
+    <tr data-id="{{ s.id }}">
+      <td class="text-subtle">{{ s.id }}</td>
+      <td class="text-muted">{{ s.submitted_at }}</td>
+      <td>{{ s.username }}</td>
+      <td><span class="badge badge-{{ s.game_id }}">{{ s.game_name }}</span></td>
+      <td>{{ s.base_score }}</td>
+      <td class="text-muted">+{{ s.speed_bonus }}</td>
+      <td><strong>{{ s.total_score }}</strong></td>
+      <td>{{ s.submission_rank }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Suggestions -->
+<div class="section-title">Suggestions</div>
+{% if suggestions %}
+<table id="sug-table">
+{% else %}
+<div class="empty" id="sug-empty">No suggestions yet today.</div>
+<table id="sug-table" style="display:none;">
+{% endif %}
+  <thead>
+    <tr>
+      <th>#</th><th>Time</th><th>Username</th><th>Game</th><th>Description</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody id="sug-body">
+    {% for s in suggestions %}
+    <tr data-id="{{ s.id }}">
+      <td class="text-subtle">{{ s.id }}</td>
+      <td class="text-muted">{{ s.suggested_at }}</td>
+      <td>{{ s.username }}</td>
+      <td>{{ s.game_name }}</td>
+      <td class="text-muted">{{ s.description }}</td>
+      <td><span class="badge {% if s.polled %}badge-polled{% else %}badge-pending{% endif %}">
+        {% if s.polled %}Polled{% else %}Pending{% endif %}
+      </span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+(function () {
+  var lastSubId = {{ last_sub_id }};
+  var lastSugId = {{ last_sug_id }};
+  var paused = false;
+  var pulse = document.getElementById('pulse');
+  var statusText = document.getElementById('status-text');
+  var pauseBtn = document.getElementById('pauseBtn');
+
+  pauseBtn.addEventListener('click', function () {
+    paused = !paused;
+    pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    pulse.classList.toggle('paused', paused);
+    statusText.textContent = paused ? 'Paused' : 'Listening…';
+  });
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function buildSubRow(s) {
+    var tr = document.createElement('tr');
+    tr.dataset.id = s.id;
+    tr.className = 'new-row';
+    tr.innerHTML =
+      '<td class="text-subtle">' + s.id + '</td>' +
+      '<td class="text-muted">' + esc(s.submitted_at) + '</td>' +
+      '<td>' + esc(s.username) + '</td>' +
+      '<td><span class="badge badge-' + esc(s.game_id) + '">' + esc(s.game_name) + '</span></td>' +
+      '<td>' + s.base_score + '</td>' +
+      '<td class="text-muted">+' + s.speed_bonus + '</td>' +
+      '<td><strong>' + s.total_score + '</strong></td>' +
+      '<td>' + s.submission_rank + '</td>';
+    return tr;
+  }
+
+  function buildSugRow(s) {
+    var tr = document.createElement('tr');
+    tr.dataset.id = s.id;
+    tr.className = 'new-row';
+    var badgeCls = s.polled ? 'badge-polled' : 'badge-pending';
+    var badgeLabel = s.polled ? 'Polled' : 'Pending';
+    tr.innerHTML =
+      '<td class="text-subtle">' + s.id + '</td>' +
+      '<td class="text-muted">' + esc(s.suggested_at) + '</td>' +
+      '<td>' + esc(s.username) + '</td>' +
+      '<td>' + esc(s.game_name) + '</td>' +
+      '<td class="text-muted">' + esc(s.description) + '</td>' +
+      '<td><span class="badge ' + badgeCls + '">' + badgeLabel + '</span></td>';
+    return tr;
+  }
+
+  function prepend(tbody, tableEl, emptyEl, row) {
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (tableEl) tableEl.style.display = '';
+    tbody.insertBefore(row, tbody.firstChild);
+  }
+
+  function pollSubs() {
+    fetch('/admin/live/feed?after=' + lastSubId)
+      .then(function (r) { return r.json(); })
+      .then(function (rows) {
+        var tbody = document.getElementById('sub-body');
+        var table = document.getElementById('sub-table');
+        var empty = document.getElementById('sub-empty');
+        rows.forEach(function (s) {
+          if (s.id > lastSubId) lastSubId = s.id;
+          prepend(tbody, table, empty, buildSubRow(s));
+        });
+        return rows.length;
+      });
+  }
+
+  function pollSugs() {
+    fetch('/admin/live/suggestions?after=' + lastSugId)
+      .then(function (r) { return r.json(); })
+      .then(function (rows) {
+        var tbody = document.getElementById('sug-body');
+        var table = document.getElementById('sug-table');
+        var empty = document.getElementById('sug-empty');
+        rows.forEach(function (s) {
+          if (s.id > lastSugId) lastSugId = s.id;
+          prepend(tbody, table, empty, buildSugRow(s));
+        });
+        return rows.length;
+      });
+  }
+
+  function poll() {
+    if (paused) return;
+    Promise.all([pollSubs(), pollSugs()])
+      .then(function (counts) {
+        var total = (counts[0] || 0) + (counts[1] || 0);
+        if (total > 0) {
+          statusText.textContent = total + ' new · ' + new Date().toLocaleTimeString();
+        }
+      })
+      .catch(function () {
+        statusText.textContent = 'Connection error — retrying…';
+      });
+  }
+
+  setInterval(poll, 3000);
+})();
+</script>
+{% endblock %}

@@ -72,6 +72,14 @@ class Submission(Base):
     game: Mapped["Game"] = relationship("Game", back_populates="submissions")
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class UserPreference(Base):
     __tablename__ = "user_preferences"
 
@@ -121,6 +129,17 @@ def get_engine(db_path: str | None = None):
 # ---------------------------------------------------------------------------
 
 
+def upsert_user(session: Session, user_id: str, username: str) -> None:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    user = session.get(User, user_id)
+    if user is None:
+        session.add(User(user_id=user_id, username=username, updated_at=now))
+    else:
+        user.username = username
+        user.updated_at = now
+    session.flush()
+
+
 def is_duplicate(
     session: Session, user_id: str, game_id: str, submission_date: date
 ) -> bool:
@@ -143,6 +162,7 @@ def record_submission(
 ) -> "Submission | None":
     from bot.scoring import assign_submission_rank
 
+    upsert_user(session, parse_result.user_id, username)
     submission = Submission(
         user_id=parse_result.user_id,
         username=username,
@@ -192,6 +212,7 @@ def add_submission_manual(
 ) -> "Submission":
     from bot.scoring import assign_submission_rank
 
+    upsert_user(session, user_id, username)
     submission = Submission(
         user_id=user_id,
         username=username,
@@ -251,13 +272,14 @@ def get_users_summary(session: Session) -> list[UserSummary]:
     rows = session.execute(
         select(
             Submission.user_id,
-            Submission.username,
+            User.username,
             func.sum(Submission.total_score).label("total_score"),
             func.count(Submission.id).label("submission_count"),
             func.count(distinct(Submission.game_id)).label("game_count"),
             func.max(Submission.date).label("last_date"),
         )
-        .group_by(Submission.user_id, Submission.username)
+        .join(User, Submission.user_id == User.user_id)
+        .group_by(Submission.user_id)
         .order_by(func.sum(Submission.total_score).desc())
     ).all()
     return [
@@ -317,11 +339,12 @@ def get_leaderboard(
     stmt = (
         select(
             Submission.user_id,
-            Submission.username,
+            User.username,
             func.sum(Submission.total_score).label("total_score"),
             func.count(Submission.id).label("submission_count"),
         )
-        .group_by(Submission.user_id, Submission.username)
+        .join(User, Submission.user_id == User.user_id)
+        .group_by(Submission.user_id)
         .order_by(func.sum(Submission.total_score).desc())
     )
 
@@ -420,11 +443,14 @@ def get_yesterday_digest(session: Session) -> list["GameDigestData"]:
             continue
 
         top_streak = max(get_streak(session, sub.user_id, game.id) for sub in subs)
+        winner_user = session.get(User, subs[0].user_id)
         results.append(
             GameDigestData(
                 game_id=game.id,
                 game_name=game.name,
-                winner_username=subs[0].username,
+                winner_username=(
+                    winner_user.username if winner_user else subs[0].username
+                ),
                 winner_score=subs[0].total_score,
                 participant_count=len(subs),
                 top_streak=top_streak,
@@ -436,7 +462,8 @@ def get_yesterday_digest(session: Session) -> list["GameDigestData"]:
 
 def get_all_streaks(session: Session, game_id: str) -> list[tuple[str, str, int]]:
     rows = session.execute(
-        select(Submission.user_id, Submission.username)
+        select(Submission.user_id, User.username)
+        .join(User, Submission.user_id == User.user_id)
         .where(Submission.game_id == game_id)
         .distinct()
     ).all()
@@ -535,8 +562,10 @@ def get_head_to_head(
     if not rows:
         return None
 
-    caller_username = rows[0][0].username
-    opponent_username = rows[0][1].username
+    caller_user = session.get(User, caller_id)
+    opponent_user = session.get(User, opponent_id)
+    caller_username = caller_user.username if caller_user else rows[0][0].username
+    opponent_username = opponent_user.username if opponent_user else rows[0][1].username
     caller_wins = caller_losses = ties = 0
     caller_total = opponent_total = 0.0
 
