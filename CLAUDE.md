@@ -4,15 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-**Setup and run (Podman):**
+**Setup and run:**
 ```bash
 make setup    # copy .env.example → .env, generate SECRET_KEY
 make up       # build images, run migrations, start bot + web
+make restart  # rebuild images and restart (required after any code change)
 make down     # stop all services
 make logs     # tail logs
 make migrate  # run migrations only
 make clean    # remove containers, volumes, and data/
 ```
+
+> **Important:** Code is baked into the Docker image at build time — `docker restart` runs stale code. Always use `make restart` (not `docker restart`) after editing source files.
 
 **Testing:**
 ```bash

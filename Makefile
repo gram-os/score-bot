@@ -6,6 +6,7 @@ help:
 	@echo "  setup    Copy .env.example to .env and generate a SECRET_KEY"
 	@echo "  build    Build Docker images"
 	@echo "  up       Start all services (migrate + bot + web)"
+	@echo "  restart  Rebuild images and restart all services (use after code changes)"
 	@echo "  down     Stop all services"
 	@echo "  logs     Tail logs from all services"
 	@echo "  migrate  Run database migrations only"
@@ -35,6 +36,11 @@ build:
 	docker compose build
 
 up:
+	mkdir -p data
+	docker compose up -d
+
+restart:
+	docker compose build
 	mkdir -p data
 	docker compose up -d
 

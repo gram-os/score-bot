@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ username }} — Score Bot Admin{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="/admin/users" class="back-link">&larr; All Users</a>
+  <h2 style="margin-bottom:0;">{{ username }}</h2>
+  <code class="text-subtle" style="font-size:12px;">{{ user_id }}</code>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <div class="stat-card">
+    <div class="stat-label">Total Score</div>
+    <div class="stat-value">{{ total_score | int }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Submissions</div>
+    <div class="stat-value">{{ submissions | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Games</div>
+    <div class="stat-value">{{ games_played | length }}</div>
+  </div>
+</div>
+
+{% if submissions %}
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Game</th>
+      <th>Date</th>
+      <th>Base Score</th>
+      <th>Speed Bonus</th>
+      <th>Total Score</th>
+      <th>Rank</th>
+      <th>Submitted At</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in submissions %}
+    <tr>
+      <td>{{ s.id }}</td>
+      <td><span class="badge badge-{{ s.game_id }}">{{ s.game_id }}</span></td>
+      <td>{{ s.date }}</td>
+      <td>{{ s.base_score | int }}</td>
+      <td>+{{ s.speed_bonus }}</td>
+      <td><strong>{{ s.total_score | int }}</strong></td>
+      <td>{{ s.submission_rank }}</td>
+      <td>{{ s.submitted_at.strftime('%Y-%m-%d %H:%M') if s.submitted_at else '' }}</td>
+      <td>
+        <form method="post" action="/admin/submissions/{{ s.id }}/delete"
+              onsubmit="return confirm('Delete this submission?')">
+          <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No submissions found for this user.</div>
+{% endif %}
+{% endblock %}

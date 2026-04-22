@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     create_engine,
+    distinct,
     func,
     select,
     update,
@@ -207,6 +208,69 @@ def add_submission_manual(
     session.flush()
     assign_submission_rank(session, game_id, submission_date)
     return submission
+
+
+def bulk_delete_submissions(
+    session: Session, game_id: str, submission_date: date
+) -> int:
+    submissions = session.scalars(
+        select(Submission).where(
+            Submission.game_id == game_id,
+            Submission.date == submission_date,
+        )
+    ).all()
+    count = len(submissions)
+    for sub in submissions:
+        session.delete(sub)
+    session.flush()
+    return count
+
+
+def recalculate_game_ranks(session: Session, game_id: str) -> int:
+    from bot.scoring import assign_submission_rank
+
+    dates = session.scalars(
+        select(Submission.date).where(Submission.game_id == game_id).distinct()
+    ).all()
+    for d in dates:
+        assign_submission_rank(session, game_id, d)
+    return len(dates)
+
+
+@dataclass
+class UserSummary:
+    user_id: str
+    username: str
+    total_score: float
+    submission_count: int
+    game_count: int
+    last_date: date | None
+
+
+def get_users_summary(session: Session) -> list[UserSummary]:
+    rows = session.execute(
+        select(
+            Submission.user_id,
+            Submission.username,
+            func.sum(Submission.total_score).label("total_score"),
+            func.count(Submission.id).label("submission_count"),
+            func.count(distinct(Submission.game_id)).label("game_count"),
+            func.max(Submission.date).label("last_date"),
+        )
+        .group_by(Submission.user_id, Submission.username)
+        .order_by(func.sum(Submission.total_score).desc())
+    ).all()
+    return [
+        UserSummary(
+            user_id=row.user_id,
+            username=row.username,
+            total_score=row.total_score,
+            submission_count=row.submission_count,
+            game_count=row.game_count,
+            last_date=row.last_date,
+        )
+        for row in rows
+    ]
 
 
 # ---------------------------------------------------------------------------

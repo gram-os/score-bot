@@ -4,24 +4,42 @@
 <h2>Submission Timeline</h2>
 
 <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;">
-  <span style="font-size:13px;color:#666;margin-right:4px;">Window:</span>
+  <span style="font-size:13px;color:var(--text-muted);margin-right:4px;">Window:</span>
   <button class="btn btn-secondary day-btn" data-days="7">7 days</button>
   <button class="btn btn-secondary day-btn" data-days="30">30 days</button>
   <button class="btn btn-secondary day-btn" data-days="90">90 days</button>
 </div>
 
-<div style="background:#fff;border:1px solid #ddd;border-radius:6px;padding:16px;">
+<div class="card" style="padding:16px;">
   <canvas id="submissionsChart" height="80"></canvas>
-  <p id="emptyMsg" style="display:none;text-align:center;color:#999;padding:32px 0;font-size:13px;">No submissions in this period.</p>
+  <p id="emptyMsg" style="display:none;text-align:center;color:var(--text-subtle);padding:32px 0;font-size:13px;">No submissions in this period.</p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function () {
-  const COLORS = [
+  const COLORS_NORMAL = [
     '#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad',
     '#16a085','#d35400','#2980b9','#c0392b','#1abc9c',
   ];
+  const COLORS_CB = [
+    '#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7',
+    '#009E73','#F0E442','#AA3377','#CCBB44','#44BB99',
+  ];
+
+  function getColors() {
+    return document.documentElement.getAttribute('data-cb') === 'deuteranopia'
+      ? COLORS_CB : COLORS_NORMAL;
+  }
+
+  function getChartStyle() {
+    var s = getComputedStyle(document.documentElement);
+    return {
+      text: s.getPropertyValue('--text').trim() || '#222',
+      subtle: s.getPropertyValue('--text-subtle').trim() || '#999',
+      border: s.getPropertyValue('--border').trim() || '#ddd',
+    };
+  }
 
   let chart = null;
   let activeDays = 30;
@@ -59,7 +77,6 @@
     canvas.style.display = 'block';
     emptyMsg.style.display = 'none';
 
-    // Pivot: collect all dates and per-game counts
     const gameMap = {};
     const dateSet = new Set();
     for (const row of data) {
@@ -69,47 +86,80 @@
     }
     const dates = Array.from(dateSet).sort();
     const games = Object.keys(gameMap).sort();
+    const colors = getColors();
+    const s = getChartStyle();
 
     const datasets = games.map((game, i) => ({
       label: game,
       data: dates.map(d => gameMap[game][d] ?? 0),
-      borderColor: COLORS[i % COLORS.length],
-      backgroundColor: COLORS[i % COLORS.length] + '22',
+      borderColor: colors[i % colors.length],
+      backgroundColor: colors[i % colors.length] + '22',
       tension: 0.3,
       pointRadius: 3,
       fill: false,
     }));
 
+    const chartOptions = {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: s.text },
+        },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Date', color: s.subtle },
+          ticks: { color: s.subtle },
+          grid: { color: s.border },
+        },
+        y: {
+          title: { display: true, text: 'Submissions', color: s.subtle },
+          beginAtZero: true,
+          ticks: { precision: 0, color: s.subtle },
+          grid: { color: s.border },
+        },
+      },
+    };
+
     if (chart) {
       chart.data.labels = dates;
       chart.data.datasets = datasets;
+      chart.options = chartOptions;
       chart.update();
     } else {
       const ctx = canvas.getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
         data: { labels: dates, datasets },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'bottom' },
-          },
-          scales: {
-            x: { title: { display: true, text: 'Date' } },
-            y: {
-              title: { display: true, text: 'Submissions' },
-              beginAtZero: true,
-              ticks: { precision: 0 },
-            },
-          },
-        },
+        options: chartOptions,
       });
     }
+  }
+
+  function applyThemeToChart() {
+    if (!chart) return;
+    const colors = getColors();
+    const s = getChartStyle();
+    chart.data.datasets.forEach((ds, i) => {
+      ds.borderColor = colors[i % colors.length];
+      ds.backgroundColor = colors[i % colors.length] + '22';
+    });
+    chart.options.plugins.legend.labels.color = s.text;
+    chart.options.scales.x.ticks.color = s.subtle;
+    chart.options.scales.x.grid.color = s.border;
+    chart.options.scales.x.title.color = s.subtle;
+    chart.options.scales.y.ticks.color = s.subtle;
+    chart.options.scales.y.grid.color = s.border;
+    chart.options.scales.y.title.color = s.subtle;
+    chart.update();
   }
 
   document.querySelectorAll('.day-btn').forEach(btn => {
     btn.addEventListener('click', () => fetchAndRender(parseInt(btn.dataset.days)));
   });
+
+  document.addEventListener('themechange', applyThemeToChart);
 
   fetchAndRender(30);
 })();

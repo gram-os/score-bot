@@ -15,9 +15,12 @@ from bot.database import (
     Game,
     Submission,
     add_submission_manual,
+    bulk_delete_submissions,
     delete_submission,
     get_engine,
     get_leaderboard,
+    get_users_summary,
+    recalculate_game_ranks,
 )
 
 config = Config(environ=os.environ)
@@ -275,6 +278,24 @@ async def games_list(
     )
 
 
+@admin_router.post("/games/{game_id}/recalculate")
+async def game_recalculate(
+    request: Request,
+    game_id: str,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        affected = recalculate_game_ranks(db, game_id)
+        db.commit()
+    finally:
+        db.close()
+    request.session["flash"] = (
+        f"Recalculated scores across {affected} date(s) for {game_id}."
+    )
+    return RedirectResponse(url="/admin/games", status_code=303)
+
+
 @admin_router.post("/games/{game_id}/toggle")
 async def game_toggle(
     request: Request,
@@ -347,6 +368,147 @@ async def stats_view(
         request,
         "stats.html",
         {"active": "stats", "games": games},
+    )
+
+
+@admin_router.get("/tools")
+async def tools_view(
+    request: Request,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        games = db.execute(select(Game).order_by(Game.name)).scalars().all()
+    finally:
+        db.close()
+    flash = request.session.pop("flash", None)
+    return templates.TemplateResponse(
+        request,
+        "tools.html",
+        {
+            "active": "tools",
+            "games": games,
+            "flash": flash,
+            "tested": False,
+            "message": "",
+            "results": [],
+        },
+    )
+
+
+@admin_router.post("/tools/parse-test")
+async def tools_parse_test(
+    request: Request,
+    message: str = Form(...),
+    session: dict = Depends(require_admin),
+):
+    from datetime import datetime as dt
+
+    from bot.parsers.registry import all_parsers
+
+    db = _db_session()
+    try:
+        games = db.execute(select(Game).order_by(Game.name)).scalars().all()
+    finally:
+        db.close()
+
+    results = []
+    for parser in all_parsers():
+        matched = parser.can_parse(message)
+        parse_result = None
+        if matched:
+            parse_result = parser.parse(message, "preview_user", dt.utcnow())
+        results.append(
+            {
+                "game_id": parser.game_id,
+                "game_name": parser.game_name,
+                "matched": matched,
+                "parse_result": parse_result,
+            }
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "tools.html",
+        {
+            "active": "tools",
+            "games": games,
+            "flash": None,
+            "tested": True,
+            "message": message,
+            "results": results,
+        },
+    )
+
+
+@admin_router.post("/tools/bulk-delete")
+async def tools_bulk_delete(
+    request: Request,
+    game_id: str = Form(...),
+    date: str = Form(...),
+    session: dict = Depends(require_admin),
+):
+    submission_date = date_type.fromisoformat(date)
+    db = _db_session()
+    try:
+        count = bulk_delete_submissions(db, game_id, submission_date)
+        db.commit()
+    finally:
+        db.close()
+    request.session["flash"] = f"Deleted {count} submission(s) for {game_id} on {date}."
+    return RedirectResponse(url="/admin/tools", status_code=303)
+
+
+@admin_router.get("/users")
+async def users_list(
+    request: Request,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        users = get_users_summary(db)
+    finally:
+        db.close()
+    return templates.TemplateResponse(
+        request,
+        "users.html",
+        {"active": "users", "users": users},
+    )
+
+
+@admin_router.get("/users/{user_id}")
+async def user_detail(
+    request: Request,
+    user_id: str,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        submissions = (
+            db.execute(
+                select(Submission)
+                .where(Submission.user_id == user_id)
+                .order_by(Submission.date.desc(), Submission.game_id)
+            )
+            .scalars()
+            .all()
+        )
+        username = submissions[0].username if submissions else user_id
+        total_score = sum(s.total_score for s in submissions)
+        games_played = sorted({s.game_id for s in submissions})
+    finally:
+        db.close()
+    return templates.TemplateResponse(
+        request,
+        "user_detail.html",
+        {
+            "active": "users",
+            "user_id": user_id,
+            "username": username,
+            "submissions": submissions,
+            "total_score": total_score,
+            "games_played": games_played,
+        },
     )
 
 

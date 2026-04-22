@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Tools — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Tools</h2>
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<style>
+  .tool-section { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-bottom: 20px; }
+  .tool-section h3 { font-size: 15px; margin-bottom: 4px; }
+  .tool-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+  .tool-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tool-form-row select, .tool-form-row input { padding: 6px 10px; border: 1px solid var(--input-border); border-radius: 4px; font-size: 13px; background: var(--surface); color: var(--text); }
+  .parse-results { margin-top: 16px; }
+  .parse-match { border: 1px solid var(--parse-match-border); border-radius: 6px; background: var(--parse-match-bg); padding: 14px; margin-bottom: 10px; }
+  .parse-match-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; }
+  .parse-table { width: auto; border: none; background: transparent; }
+  .parse-table th { background: transparent; border-bottom: none; font-size: 12px; color: var(--th-text); padding: 3px 12px 3px 0; white-space: nowrap; }
+  .parse-table td { border-bottom: none; font-size: 13px; padding: 3px 0; font-family: monospace; }
+  .parse-no-match { padding: 16px; background: var(--c-warning-bg); border: 1px solid var(--c-warning-border); border-radius: 4px; color: var(--c-warning-text); font-size: 13px; }
+</style>
+
+<div class="tool-section">
+  <h3>Parser Tester</h3>
+  <p class="tool-desc">Paste a raw Discord message to see which parser matches it and what score would be recorded.</p>
+  <form method="post" action="/admin/tools/parse-test">
+    <textarea name="message" rows="6" placeholder="Paste Discord message here…">{{ message }}</textarea>
+    <button type="submit" class="btn btn-primary" style="margin-top:8px;">Test</button>
+  </form>
+
+  {% if tested %}
+  <div class="parse-results">
+    {% set matched_list = [] %}
+    {% for r in results %}{% if r.matched %}{% set _ = matched_list.append(r) %}{% endif %}{% endfor %}
+
+    {% if matched_list %}
+      {% for r in matched_list %}
+      <div class="parse-match">
+        <div class="parse-match-header">
+          <strong>{{ r.game_name }}</strong>
+          <span class="badge badge-{{ r.game_id }}">{{ r.game_id }}</span>
+        </div>
+        {% if r.parse_result %}
+        <table class="parse-table">
+          <tr><th>Base Score</th><td>{{ r.parse_result.base_score | int }}</td></tr>
+          <tr><th>Date</th><td>{{ r.parse_result.date }}</td></tr>
+          {% for k, v in r.parse_result.raw_data.items() %}
+          <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+          {% endfor %}
+        </table>
+        {% else %}
+        <p class="text-danger" style="font-size:13px;">can_parse() matched but parse() returned None.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="parse-no-match">No parser matched this message.</div>
+    {% endif %}
+
+    <details style="margin-top:12px;">
+      <summary style="font-size:12px;color:var(--text-subtle);cursor:pointer;">All parsers ({{ results | length }})</summary>
+      <table style="margin-top:8px;width:auto;">
+        <thead><tr><th>Parser</th><th>Matched</th></tr></thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td>{{ r.game_name }}</td>
+            <td style="color:{% if r.matched %}var(--c-success){% else %}var(--text-subtle){% endif %};">
+              {% if r.matched %}✓{% else %}–{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  </div>
+  {% endif %}
+</div>
+
+<div class="tool-section">
+  <h3>Bulk Delete Submissions</h3>
+  <p class="tool-desc">Delete all submissions for a specific game on a specific date. This cannot be undone.</p>
+  <form method="post" action="/admin/tools/bulk-delete"
+        onsubmit="return confirm('Delete ALL submissions for this game and date? This cannot be undone.')">
+    <div class="tool-form-row">
+      <select name="game_id" required>
+        <option value="">Select game…</option>
+        {% for g in games %}
+        <option value="{{ g.id }}">{{ g.name }}</option>
+        {% endfor %}
+      </select>
+      <input type="date" name="date" required>
+      <button type="submit" class="btn btn-danger">Delete All</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
