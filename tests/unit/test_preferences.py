@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from bot.database import Base, UserPreference, get_preference, set_preference
+from bot.database import Base, get_preference, set_preference
 
 
 @pytest.fixture(scope="module")
