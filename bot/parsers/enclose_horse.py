@@ -49,7 +49,7 @@ class EncloseHorseParser(GameParser):
                 else:
                     pts = round(pct / 100 * 15)
                     bonus_rounds.append({"variant": variant, "pct": pct, "pts": pts})
-            
+
             # Case 2: "No Horse" Result (e.g., 🥉 okay 🥉)
             # We treat this as the main_pct if it hasn't been set yet
             elif main_pct is None:
