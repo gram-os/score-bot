@@ -4,6 +4,8 @@ import os
 from datetime import timezone
 
 import discord
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from discord import app_commands
 from discord.ext import tasks
 from dotenv import load_dotenv
@@ -20,12 +22,16 @@ from bot.database import (
     get_head_to_head,
     get_latest_unnotified_poll,
     get_leaderboard,
+    get_opted_in_preferences,
     get_personal_bests,
+    get_preference,
     get_streak,
     get_unpolled_suggestions,
+    get_yesterday_digest,
     is_duplicate,
     mark_poll_notified,
     record_submission,
+    set_preference,
 )
 from bot.parsers.registry import ParserRegistry
 
@@ -44,6 +50,12 @@ ADMIN_DISCORD_IDS: list[int] = [
 ]
 _POLL_HOUR = int(os.environ.get("POLL_HOUR", "9"))
 _POLL_TIME = datetime.time(hour=_POLL_HOUR, tzinfo=datetime.timezone.utc)
+
+_DIGEST_TIME = os.environ.get("DIGEST_TIME", "09:00")
+_digest_hour, _digest_minute = (int(x) for x in _DIGEST_TIME.split(":"))
+
+_REMINDER_TIME = os.environ.get("REMINDER_TIME", "20:00")
+_reminder_hour, _reminder_minute = (int(x) for x in _REMINDER_TIME.split(":"))
 
 GAME_CHOICES = [
     app_commands.Choice(name="All", value="all"),
@@ -88,6 +100,7 @@ class ScoreBot(discord.Client):
         engine = get_engine(DATABASE_PATH)
         self.Session = sessionmaker(bind=engine)
 
+        self._scheduler = AsyncIOScheduler()
         self._register_commands()
 
     def _register_commands(self) -> None:
@@ -352,6 +365,38 @@ class ScoreBot(discord.Client):
                 or current.lower() in p.game_id.lower()
             ]
 
+        @self.tree.command(
+            name="remind",
+            description="Toggle streak reminders for yourself",
+        )
+        @app_commands.describe(
+            threshold="Minimum streak length to trigger a reminder (0 = opt out, default 3)"
+        )
+        async def remind(
+            interaction: discord.Interaction,
+            threshold: int = 3,
+        ) -> None:
+            user_id = str(interaction.user.id)
+            with self.Session() as session:
+                pref = get_preference(session, user_id)
+                currently_opted_in = pref is not None and pref.remind_streak_days > 0
+
+                if threshold == 0 or currently_opted_in:
+                    set_preference(session, user_id, remind_streak_days=0)
+                    session.commit()
+                    await interaction.response.send_message(
+                        "Streak reminders **disabled**. You won't receive reminder DMs.",
+                        ephemeral=True,
+                    )
+                else:
+                    set_preference(session, user_id, remind_streak_days=threshold)
+                    session.commit()
+                    await interaction.response.send_message(
+                        f"Streak reminders **enabled** — you'll be reminded when your streak reaches "
+                        f"**{threshold}** days.",
+                        ephemeral=True,
+                    )
+
     async def on_ready(self) -> None:
         log.info("Logged in as %s (id=%s)", self.user, self.user.id)
         await self.tree.sync()
@@ -361,6 +406,33 @@ class ScoreBot(discord.Client):
             log.info("Synced slash commands to guild %s", guild.name)
         if not self.daily_suggestion_poll.is_running():
             self.daily_suggestion_poll.start()
+        if not self._scheduler.running:
+            self._scheduler.add_job(
+                self._send_daily_digest,
+                CronTrigger(hour=_digest_hour, minute=_digest_minute),
+                replace_existing=True,
+            )
+            self._scheduler.add_job(
+                self._send_streak_reminders,
+                CronTrigger(hour=_reminder_hour, minute=_reminder_minute),
+                replace_existing=True,
+            )
+            self._scheduler.start()
+            log.info(
+                "Digest scheduler started (fires at %02d:%02d local)",
+                _digest_hour,
+                _digest_minute,
+            )
+            log.info(
+                "Reminder scheduler started (fires at %02d:%02d local)",
+                _reminder_hour,
+                _reminder_minute,
+            )
+
+    async def close(self) -> None:
+        if self._scheduler.running:
+            self._scheduler.shutdown(wait=False)
+        await super().close()
 
     @tasks.loop(time=_POLL_TIME)
     async def daily_suggestion_poll(self) -> None:
@@ -488,6 +560,75 @@ class ScoreBot(discord.Client):
                 )
             except Exception:
                 log.warning("Could not DM admin %s", admin_id)
+
+    async def _send_daily_digest(self) -> None:
+        channel = self.get_channel(DISCORD_CHANNEL_ID)
+        if channel is None:
+            log.warning("Digest: channel %s not found", DISCORD_CHANNEL_ID)
+            return
+
+        with self.Session() as session:
+            digest_data = get_yesterday_digest(session)
+
+        if not any(d.participant_count > 0 for d in digest_data):
+            return
+
+        yesterday = (
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
+        ).date()
+        embed = discord.Embed(
+            title=f"Daily Digest — {yesterday}",
+            color=discord.Color.blurple(),
+        )
+
+        lines = []
+        for d in digest_data:
+            if d.participant_count == 0:
+                lines.append(f"**{d.game_name}** — no activity")
+            else:
+                players = f"{d.participant_count} player{'s' if d.participant_count != 1 else ''}"
+                streak_str = (
+                    f" | 🔥 Top streak: {d.top_streak}" if d.top_streak >= 1 else ""
+                )
+                lines.append(
+                    f"**{d.game_name}** — 🏆 {d.winner_username} ({d.winner_score:.0f} pts)"
+                    f" | {players}{streak_str}"
+                )
+        embed.description = "\n".join(lines)
+        await channel.send(embed=embed)
+
+    async def _send_streak_reminders(self) -> None:
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+
+        with self.Session() as session:
+            prefs = get_opted_in_preferences(session)
+            enabled_games = (
+                session.execute(select(Game).where(Game.enabled.is_(True)))
+                .scalars()
+                .all()
+            )
+
+            reminders: dict[str, list[str]] = {}
+            for pref in prefs:
+                qualifying_games = []
+                for game in enabled_games:
+                    streak = get_streak(session, pref.user_id, game.id)
+                    if streak >= pref.remind_streak_days and not is_duplicate(
+                        session, pref.user_id, game.id, today
+                    ):
+                        qualifying_games.append(game.name)
+                if qualifying_games:
+                    reminders[pref.user_id] = qualifying_games
+
+        for user_id, game_names in reminders.items():
+            try:
+                user = await self.fetch_user(int(user_id))
+                games_list = ", ".join(f"**{g}**" for g in game_names)
+                await user.send(
+                    f"Don't break your streak! You haven't submitted today for: {games_list}"
+                )
+            except Exception:
+                log.warning("Could not DM reminder to user %s", user_id)
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot:
