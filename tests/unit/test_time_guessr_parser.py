@@ -40,10 +40,10 @@ class TestTimeGuessrParserCanParse:
 class TestTimeGuessrParserParse:
     parser = TimeGuessrParser()
 
-    def test_score_floored_integer(self):
+    def test_score_ceiled_integer(self):
         result = self.parser.parse(TIMEGUESSR_SAMPLE, USER_ID, TIMESTAMP)
         assert result is not None
-        assert result.base_score == float(31590 * 100 // 50000)
+        assert result.base_score == 64.0
         assert result.raw_data["raw_score"] == 31590
         assert result.raw_data["max_score"] == 50_000
         assert result.raw_data["puzzle_number"] == 1057
@@ -56,7 +56,7 @@ class TestTimeGuessrParserParse:
     def test_low_score(self):
         result = self.parser.parse(TIMEGUESSR_LOW, USER_ID, TIMESTAMP)
         assert result is not None
-        assert result.base_score == float(5000 * 100 // 50000)
+        assert result.base_score == 10.0
 
     def test_score_is_float(self):
         result = self.parser.parse(TIMEGUESSR_SAMPLE, USER_ID, TIMESTAMP)
