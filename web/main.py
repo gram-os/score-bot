@@ -8,7 +8,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from bot.database import get_engine
 from bot.log_handler import setup_db_logging
-from web.auth import NotAuthenticated, admin_router, router as auth_router
+from web.auth import admin_router, router as auth_router
+from web.deps import NotAuthenticated
 
 
 @asynccontextmanager
