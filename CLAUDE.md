@@ -65,3 +65,16 @@ Each game has a parser in `bot/parsers/` that extends `GameParser` (ABC in `base
 ### Auth
 
 Admin access is controlled purely by `ADMIN_DISCORD_IDS` env var (comma-separated Discord user IDs). There is no role table. Session cookie is signed with `SECRET_KEY`.
+
+## Git Environment Notes
+- This repo may not have `origin/HEAD` set. When diffing against the default branch, use `origin/main` explicitly rather than `origin/HEAD`.
+- If a slash command fails at a git step, surface the error to the user immediately rather than silently exiting.
+
+## Coding Style
+
+- **Atomic Functions:** Prefer many small, single-purpose functions (10-20 lines) over large logic blocks.
+- **DRY (Don't Repeat Yourself):** Actively look for duplicated logic across services (bot/web) and move shared logic to a common utility or service layer.
+- **Maintain Contracts:** When refactoring, ensure existing function signatures and API endpoints remain stable. If a breaking change is necessary, document it clearly before proceeding.
+- **No Inline Imports:** All imports must be at the top of the file. Do not use imports inside functions or classes to solve circular dependencies; refactor the architecture instead.
+- **Type Hinting:** Use strict Python type hints for all new function signatures and class attributes.
+- **Async Efficiency:** Both bot and web services are async. Avoid blocking I/O; use `await` where possible or `run_in_executor` for CPU-bound tasks.
