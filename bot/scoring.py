@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from bot.database import Submission
+from bot.db.models import Submission
 
 
 def calculate_speed_bonus(rank: int) -> int:
