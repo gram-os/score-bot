@@ -22,9 +22,7 @@ class MiniCrosswordParser(GameParser):
     def can_parse(self, message: str) -> bool:
         return bool(_PATTERN.search(message))
 
-    def parse(
-        self, message: str, user_id: str, timestamp: datetime
-    ) -> ParseResult | None:
+    def parse(self, message: str, user_id: str, timestamp: datetime) -> ParseResult | None:
         m = _PATTERN.search(message)
         if not m:
             return None

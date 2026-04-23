@@ -7,9 +7,7 @@ TIMESTAMP = datetime(2024, 1, 15, 12, 0, 0)
 
 CONNECTIONS_PERFECT = "Connections\nPuzzle #100\n🟨🟨🟨🟨\n🟩🟩🟩🟩\n🟦🟦🟦🟦\n🟪🟪🟪🟪"
 CONNECTIONS_TWO_MISSES = "Connections\nPuzzle #101\n🟨🟩🟦🟪\n🟩🟩🟩🟩\n🟨🟦🟨🟦\n🟦🟦🟦🟦\n🟨🟨🟨🟨\n🟪🟪🟪🟪"
-CONNECTIONS_FAILED = (
-    "Connections\nPuzzle #102\n🟨🟩🟦🟪\n🟩🟨🟦🟪\n🟦🟨🟩🟪\n🟪🟨🟩🟦\n🟨🟨🟨🟩"
-)
+CONNECTIONS_FAILED = "Connections\nPuzzle #102\n🟨🟩🟦🟪\n🟩🟨🟦🟪\n🟦🟨🟩🟪\n🟪🟨🟩🟦\n🟨🟨🟨🟩"
 
 
 class TestConnectionsParserCanParse:

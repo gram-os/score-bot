@@ -43,13 +43,9 @@ class Game(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    submissions: Mapped[list["Submission"]] = relationship(
-        "Submission", back_populates="game"
-    )
+    submissions: Mapped[list["Submission"]] = relationship("Submission", back_populates="game")
 
 
 class Submission(Base):
@@ -66,9 +62,7 @@ class Submission(Base):
     total_score: Mapped[float] = mapped_column(Float, nullable=False)
     submission_rank: Mapped[int] = mapped_column(Integer, nullable=False)
     raw_data: Mapped[dict] = mapped_column(JSON, nullable=False)
-    submitted_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     game: Mapped["Game"] = relationship("Game", back_populates="submissions")
 
@@ -97,9 +91,7 @@ class DailyPoll(Base):
     is_yes_no: Mapped[bool] = mapped_column(Boolean, nullable=False)
     notified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    suggestions: Mapped[list["GameSuggestion"]] = relationship(
-        "GameSuggestion", back_populates="poll"
-    )
+    suggestions: Mapped[list["GameSuggestion"]] = relationship("GameSuggestion", back_populates="poll")
 
 
 class GameSuggestion(Base):
@@ -111,13 +103,9 @@ class GameSuggestion(Base):
     game_name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     suggested_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    poll_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("daily_polls.id"), nullable=True
-    )
+    poll_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("daily_polls.id"), nullable=True)
 
-    poll: Mapped["DailyPoll | None"] = relationship(
-        "DailyPoll", back_populates="suggestions"
-    )
+    poll: Mapped["DailyPoll | None"] = relationship("DailyPoll", back_populates="suggestions")
 
 
 class UserStreak(Base):
@@ -156,12 +144,17 @@ class AppLog(Base):
     __tablename__ = "app_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     level: Mapped[str] = mapped_column(String, nullable=False)
     logger: Mapped[str] = mapped_column(String, nullable=False)
     message: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class AdminConfig(Base):
+    __tablename__ = "admin_config"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(String, nullable=False)
 
 
 def get_engine(db_path: str | None = None):
@@ -185,9 +178,7 @@ def upsert_user(session: Session, user_id: str, username: str) -> None:
     session.flush()
 
 
-def is_duplicate(
-    session: Session, user_id: str, game_id: str, submission_date: date
-) -> bool:
+def is_duplicate(session: Session, user_id: str, game_id: str, submission_date: date) -> bool:
     return (
         session.scalar(
             select(func.count())
@@ -202,9 +193,7 @@ def is_duplicate(
     )
 
 
-def record_submission(
-    session: Session, parse_result, username: str
-) -> "Submission | None":
+def record_submission(session: Session, parse_result, username: str) -> "Submission | None":
     from bot.scoring import assign_submission_rank
 
     upsert_user(session, parse_result.user_id, username)
@@ -276,9 +265,7 @@ def add_submission_manual(
     return submission
 
 
-def bulk_delete_submissions(
-    session: Session, game_id: str, submission_date: date
-) -> int:
+def bulk_delete_submissions(session: Session, game_id: str, submission_date: date) -> int:
     submissions = session.scalars(
         select(Submission).where(
             Submission.game_id == game_id,
@@ -295,9 +282,7 @@ def bulk_delete_submissions(
 def recalculate_game_ranks(session: Session, game_id: str) -> int:
     from bot.scoring import assign_submission_rank
 
-    dates = session.scalars(
-        select(Submission.date).where(Submission.game_id == game_id).distinct()
-    ).all()
+    dates = session.scalars(select(Submission.date).where(Submission.game_id == game_id).distinct()).all()
     for d in dates:
         assign_submission_rank(session, game_id, d)
     return len(dates)
@@ -445,9 +430,7 @@ def get_streak(session: Session, user_id: str, game_id: str) -> int:
     return row.current_streak if _is_streak_active(row) else 0
 
 
-def get_user_streak(
-    session: Session, user_id: str, game_id: str
-) -> "UserStreak | None":
+def get_user_streak(session: Session, user_id: str, game_id: str) -> "UserStreak | None":
     return session.scalar(
         select(UserStreak).where(
             UserStreak.user_id == user_id,
@@ -470,9 +453,7 @@ def get_all_streaks(session: Session, game_id: str) -> list[tuple[str, str, int]
     ).all()
     results = []
     for r in rows:
-        days_since = (
-            (today - r.last_submission_date).days if r.last_submission_date else 999
-        )
+        days_since = (today - r.last_submission_date).days if r.last_submission_date else 999
         active = r.current_streak if days_since <= 1 else 0
         results.append((r.user_id, r.username, active))
     results.sort(key=lambda x: x[2], reverse=True)
@@ -581,9 +562,7 @@ def get_yesterday_digest(session: Session) -> list["GameDigestData"]:
             GameDigestData(
                 game_id=game.id,
                 game_name=game.name,
-                winner_username=(
-                    winner_user.username if winner_user else subs[0].username
-                ),
+                winner_username=(winner_user.username if winner_user else subs[0].username),
                 winner_score=subs[0].total_score,
                 participant_count=len(subs),
                 top_streak=top_streak,
@@ -696,9 +675,7 @@ def get_weekly_digest(session: Session) -> "WeeklyDigestData":
 
 def get_current_season(session: Session) -> "Season | None":
     today = datetime.now(timezone.utc).date()
-    return session.scalar(
-        select(Season).where(and_(Season.start_date <= today, Season.end_date >= today))
-    )
+    return session.scalar(select(Season).where(and_(Season.start_date <= today, Season.end_date >= today)))
 
 
 def get_season_ending_yesterday(session: Session) -> "Season | None":
@@ -714,9 +691,7 @@ def get_season_ending_yesterday(session: Session) -> "Season | None":
 def get_user_achievements(session: Session, user_id: str) -> list["UserAchievement"]:
     return list(
         session.scalars(
-            select(UserAchievement)
-            .where(UserAchievement.user_id == user_id)
-            .order_by(UserAchievement.earned_at)
+            select(UserAchievement).where(UserAchievement.user_id == user_id).order_by(UserAchievement.earned_at)
         ).all()
     )
 
@@ -758,9 +733,7 @@ class PersonalBests:
     count: int
 
 
-def get_personal_bests(
-    session: Session, user_id: str, game_id: str
-) -> "PersonalBests | None":
+def get_personal_bests(session: Session, user_id: str, game_id: str) -> "PersonalBests | None":
     rows = (
         session.execute(
             select(Submission)
@@ -815,8 +788,7 @@ def get_head_to_head(
         select(caller_sub, opponent_sub)
         .join(
             opponent_sub,
-            (caller_sub.date == opponent_sub.date)
-            & (caller_sub.game_id == opponent_sub.game_id),
+            (caller_sub.date == opponent_sub.date) & (caller_sub.game_id == opponent_sub.game_id),
         )
         .where(
             caller_sub.user_id == caller_id,
@@ -895,11 +867,7 @@ def add_suggestion(
 
 
 def get_unpolled_suggestions(session: Session) -> list[GameSuggestion]:
-    return list(
-        session.execute(
-            select(GameSuggestion).where(GameSuggestion.poll_id.is_(None))
-        ).scalars()
-    )
+    return list(session.execute(select(GameSuggestion).where(GameSuggestion.poll_id.is_(None))).scalars())
 
 
 def create_daily_poll(
@@ -916,11 +884,7 @@ def create_daily_poll(
     )
     session.add(poll)
     session.flush()
-    session.execute(
-        update(GameSuggestion)
-        .where(GameSuggestion.id.in_(suggestion_ids))
-        .values(poll_id=poll.id)
-    )
+    session.execute(update(GameSuggestion).where(GameSuggestion.id.in_(suggestion_ids)).values(poll_id=poll.id))
     return poll
 
 
@@ -946,20 +910,14 @@ def mark_poll_notified(session: Session, poll_id: int) -> None:
 
 
 def get_opted_in_preferences(session: Session) -> list["UserPreference"]:
-    return list(
-        session.execute(
-            select(UserPreference).where(UserPreference.remind_streak_days > 0)
-        ).scalars()
-    )
+    return list(session.execute(select(UserPreference).where(UserPreference.remind_streak_days > 0)).scalars())
 
 
 def get_preference(session: Session, user_id: str) -> "UserPreference | None":
     return session.get(UserPreference, user_id)
 
 
-def set_preference(
-    session: Session, user_id: str, remind_streak_days: int
-) -> "UserPreference":
+def set_preference(session: Session, user_id: str, remind_streak_days: int) -> "UserPreference":
     pref = session.get(UserPreference, user_id)
     if pref is None:
         pref = UserPreference(user_id=user_id, remind_streak_days=remind_streak_days)
@@ -1000,3 +958,22 @@ def get_logs(
     total = session.scalar(count_stmt) or 0
     rows = session.execute(data_stmt.offset(offset).limit(limit)).scalars().all()
     return rows, total
+
+
+# ---------------------------------------------------------------------------
+# Admin config
+# ---------------------------------------------------------------------------
+
+
+def get_config(session: Session, key: str, default: str = "") -> str:
+    row = session.get(AdminConfig, key)
+    return row.value if row else default
+
+
+def set_config(session: Session, key: str, value: str) -> None:
+    row = session.get(AdminConfig, key)
+    if row is None:
+        session.add(AdminConfig(key=key, value=value))
+    else:
+        row.value = value
+    session.commit()

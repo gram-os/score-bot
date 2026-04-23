@@ -25,9 +25,7 @@ class EncloseHorseParser(GameParser):
     def can_parse(self, message: str) -> bool:
         return bool(_HEADER.match(message))
 
-    def parse(
-        self, message: str, user_id: str, timestamp: datetime
-    ) -> ParseResult | None:
+    def parse(self, message: str, user_id: str, timestamp: datetime) -> ParseResult | None:
         header_m = _HEADER.match(message)
         if not header_m:
             return None

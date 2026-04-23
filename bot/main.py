@@ -53,9 +53,7 @@ DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 DISCORD_CHANNEL_ID = int(os.environ["DISCORD_CHANNEL_ID"])
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/data/scores.db")
 ADMIN_DISCORD_IDS: list[int] = [
-    int(uid.strip())
-    for uid in os.environ.get("ADMIN_DISCORD_IDS", "").split(",")
-    if uid.strip()
+    int(uid.strip()) for uid in os.environ.get("ADMIN_DISCORD_IDS", "").split(",") if uid.strip()
 ]
 
 _DIGEST_TIME = os.environ.get("DIGEST_TIME", "09:00")
@@ -135,19 +133,14 @@ class ScoreBot(discord.Client):
                     game_id=None if game_id == "all" else game_id,
                 )
                 if game_id == "all":
-                    enabled_games = (
-                        session.query(Game).filter(Game.enabled.is_(True)).all()
-                    )
+                    enabled_games = session.query(Game).filter(Game.enabled.is_(True)).all()
                     streak_map: dict[str, int] = {}
                     for g in enabled_games:
                         for uid, _, streak in get_all_streaks(session, g.id):
                             if streak > streak_map.get(uid, 0):
                                 streak_map[uid] = streak
                 else:
-                    streak_map = {
-                        uid: streak
-                        for uid, _, streak in get_all_streaks(session, game_id)
-                    }
+                    streak_map = {uid: streak for uid, _, streak in get_all_streaks(session, game_id)}
 
                 if period_value == "season":
                     current_season = get_current_season(session)
@@ -188,9 +181,7 @@ class ScoreBot(discord.Client):
                 enabled = session.query(Game).filter(Game.enabled.is_(True)).all()
 
             if not enabled:
-                await interaction.response.send_message(
-                    "No games are currently enabled."
-                )
+                await interaction.response.send_message("No games are currently enabled.")
                 return
 
             embed = discord.Embed(title="Enabled Games", color=discord.Color.blurple())
@@ -198,9 +189,7 @@ class ScoreBot(discord.Client):
             embed.description = "\n".join(lines)
             await interaction.response.send_message(embed=embed)
 
-        @self.tree.command(
-            name="suggest", description="Suggest a game to be added to the bot"
-        )
+        @self.tree.command(name="suggest", description="Suggest a game to be added to the bot")
         @app_commands.describe(
             game_name="Name of the game you want to suggest",
             description="Why should we add this game? (optional)",
@@ -243,14 +232,11 @@ class ScoreBot(discord.Client):
                 log.info("/suggest by %s: %s", interaction.user.display_name, game_name)
 
             await interaction.response.send_message(
-                f"✅ **{game_name}** has been added to the suggestion list and will "
-                "appear in tomorrow's poll!",
+                f"✅ **{game_name}** has been added to the suggestion list and will appear in tomorrow's poll!",
                 ephemeral=True,
             )
 
-        @self.tree.command(
-            name="vs", description="Head-to-head comparison against another player"
-        )
+        @self.tree.command(name="vs", description="Head-to-head comparison against another player")
         @app_commands.describe(
             opponent="The player to compare against",
             game="Which game to compare (default: all games)",
@@ -265,9 +251,7 @@ class ScoreBot(discord.Client):
             opponent_id = str(opponent.id)
 
             if caller_id == opponent_id:
-                await interaction.response.send_message(
-                    "You can't challenge yourself!", ephemeral=True
-                )
+                await interaction.response.send_message("You can't challenge yourself!", ephemeral=True)
                 return
 
             game_id = game.value if game else None
@@ -286,12 +270,8 @@ class ScoreBot(discord.Client):
                 return
 
             overlapping = result.overlapping_days
-            caller_win_rate = (
-                result.caller_wins / overlapping * 100 if overlapping else 0
-            )
-            opponent_win_rate = (
-                result.opponent_wins / overlapping * 100 if overlapping else 0
-            )
+            caller_win_rate = result.caller_wins / overlapping * 100 if overlapping else 0
+            opponent_win_rate = result.opponent_wins / overlapping * 100 if overlapping else 0
 
             embed = discord.Embed(
                 title=f"Head-to-Head — {game_label}",
@@ -304,10 +284,7 @@ class ScoreBot(discord.Client):
             )
             embed.add_field(
                 name="Total Score",
-                value=(
-                    f"{result.caller_total_score:.0f}\n"
-                    f"{result.opponent_total_score:.0f}"
-                ),
+                value=(f"{result.caller_total_score:.0f}\n{result.opponent_total_score:.0f}"),
                 inline=True,
             )
             embed.add_field(
@@ -362,16 +339,10 @@ class ScoreBot(discord.Client):
                 color=discord.Color.green(),
             )
             embed.add_field(name="Best Score", value=best_detail, inline=False)
-            embed.add_field(
-                name="Average Score", value=f"{bests.avg_score:.1f} pts", inline=True
-            )
-            embed.add_field(
-                name="Total Submissions", value=str(bests.count), inline=True
-            )
+            embed.add_field(name="Average Score", value=f"{bests.avg_score:.1f} pts", inline=True)
+            embed.add_field(name="Total Submissions", value=str(bests.count), inline=True)
             if streak >= 1:
-                embed.add_field(
-                    name="Current Streak", value=f"🔥 {streak} days", inline=True
-                )
+                embed.add_field(name="Current Streak", value=f"🔥 {streak} days", inline=True)
 
             await interaction.response.send_message(embed=embed)
 
@@ -383,8 +354,7 @@ class ScoreBot(discord.Client):
             return [
                 app_commands.Choice(name=p.game_name, value=p.game_id)
                 for p in self.registry.all_parsers()
-                if current.lower() in p.game_name.lower()
-                or current.lower() in p.game_id.lower()
+                if current.lower() in p.game_name.lower() or current.lower() in p.game_id.lower()
             ]
 
         @self.tree.command(
@@ -406,15 +376,9 @@ class ScoreBot(discord.Client):
                 season_row = None
                 if season:
                     season_rows = get_leaderboard(session, period="season")
-                    season_row = next(
-                        (r for r in season_rows if r.user_id == user_id), None
-                    )
+                    season_row = next((r for r in season_rows if r.user_id == user_id), None)
 
-                enabled_games = (
-                    session.execute(select(Game).where(Game.enabled.is_(True)))
-                    .scalars()
-                    .all()
-                )
+                enabled_games = session.execute(select(Game).where(Game.enabled.is_(True))).scalars().all()
 
                 game_stats = []
                 for g in enabled_games:
@@ -459,11 +423,7 @@ class ScoreBot(discord.Client):
                         streak_str += f" (best: {best_streak})"
                 else:
                     streak_str = "No active streak"
-                freeze_str = (
-                    f" · 🧊 {freezes} freeze{'s' if freezes != 1 else ''}"
-                    if freezes > 0
-                    else ""
-                )
+                freeze_str = f" · 🧊 {freezes} freeze{'s' if freezes != 1 else ''}" if freezes > 0 else ""
 
                 embed.add_field(
                     name=g.name,
@@ -500,9 +460,7 @@ class ScoreBot(discord.Client):
             name="remind",
             description="Toggle streak reminders for yourself",
         )
-        @app_commands.describe(
-            threshold="Minimum streak length to trigger a reminder (0 = opt out, default 3)"
-        )
+        @app_commands.describe(threshold="Minimum streak length to trigger a reminder (0 = opt out, default 3)")
         async def remind(
             interaction: discord.Interaction,
             threshold: int = 3,
@@ -699,10 +657,7 @@ class ScoreBot(discord.Client):
         if total_votes == 0:
             if poll_record.is_yes_no:
                 s = suggestions[0]
-                await channel.send(
-                    f"🗳️ The vote for **{s.game_name}** ended with no participation. "
-                    f"<@{s.user_id}>"
-                )
+                await channel.send(f"🗳️ The vote for **{s.game_name}** ended with no participation. <@{s.user_id}>")
             return
 
         if poll_record.is_yes_no:
@@ -720,24 +675,17 @@ class ScoreBot(discord.Client):
                 await self._notify_admins(s.game_name)
             else:
                 await channel.send(
-                    f"❌ **{s.game_name}** didn't pass the vote this time. "
-                    f"Better luck next time, <@{s.user_id}>!"
+                    f"❌ **{s.game_name}** didn't pass the vote this time. Better luck next time, <@{s.user_id}>!"
                 )
         else:
             by_name = {s.game_name: s for s in suggestions}
-            answers_sorted = sorted(
-                poll.answers, key=lambda a: a.vote_count, reverse=True
-            )
+            answers_sorted = sorted(poll.answers, key=lambda a: a.vote_count, reverse=True)
             winner_answer = answers_sorted[0]
 
             winner = by_name.get(winner_answer.text)
             await channel.send(
                 f"🎉 **{winner_answer.text}** won the suggestion vote! "
-                + (
-                    f"<@{winner.user_id}> your suggestion is on its way — "
-                    if winner
-                    else ""
-                )
+                + (f"<@{winner.user_id}> your suggestion is on its way — " if winner else "")
                 + "admins have been notified."
             )
             await self._notify_admins(winner_answer.text)
@@ -747,8 +695,7 @@ class ScoreBot(discord.Client):
             try:
                 user = await self.fetch_user(admin_id)
                 await user.send(
-                    f"🎮 The community voted to add **{game_name}** to the bot! "
-                    "Please look into implementing it."
+                    f"🎮 The community voted to add **{game_name}** to the bot! Please look into implementing it."
                 )
             except Exception:
                 log.warning("Could not DM admin %s", admin_id)
@@ -765,9 +712,7 @@ class ScoreBot(discord.Client):
         if not any(d.participant_count > 0 for d in digest_data):
             return
 
-        yesterday = (
-            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
-        ).date()
+        yesterday = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)).date()
         embed = discord.Embed(
             title=f"Daily Digest — {yesterday}",
             color=discord.Color.blurple(),
@@ -779,12 +724,9 @@ class ScoreBot(discord.Client):
                 lines.append(f"**{d.game_name}** — no activity")
             else:
                 players = f"{d.participant_count} player{'s' if d.participant_count != 1 else ''}"
-                streak_str = (
-                    f" | 🔥 Top streak: {d.top_streak}" if d.top_streak >= 1 else ""
-                )
+                streak_str = f" | 🔥 Top streak: {d.top_streak}" if d.top_streak >= 1 else ""
                 lines.append(
-                    f"**{d.game_name}** — 🏆 {d.winner_username} ({d.winner_score:.0f} pts)"
-                    f" | {players}{streak_str}"
+                    f"**{d.game_name}** — 🏆 {d.winner_username} ({d.winner_score:.0f} pts) | {players}{streak_str}"
                 )
         embed.description = "\n".join(lines)
         await channel.send(embed=embed)
@@ -890,20 +832,14 @@ class ScoreBot(discord.Client):
 
         with self.Session() as session:
             prefs = get_opted_in_preferences(session)
-            enabled_games = (
-                session.execute(select(Game).where(Game.enabled.is_(True)))
-                .scalars()
-                .all()
-            )
+            enabled_games = session.execute(select(Game).where(Game.enabled.is_(True))).scalars().all()
 
             reminders: dict[str, list[str]] = {}
             for pref in prefs:
                 qualifying_games = []
                 for game in enabled_games:
                     streak = get_streak(session, pref.user_id, game.id)
-                    if streak >= pref.remind_streak_days and not is_duplicate(
-                        session, pref.user_id, game.id, today
-                    ):
+                    if streak >= pref.remind_streak_days and not is_duplicate(session, pref.user_id, game.id, today):
                         qualifying_games.append(game.name)
                 if qualifying_games:
                     reminders[pref.user_id] = qualifying_games
@@ -913,9 +849,7 @@ class ScoreBot(discord.Client):
             try:
                 user = await self.fetch_user(int(user_id))
                 games_list = ", ".join(f"**{g}**" for g in game_names)
-                await user.send(
-                    f"Don't break your streak! You haven't submitted today for: {games_list}"
-                )
+                await user.send(f"Don't break your streak! You haven't submitted today for: {games_list}")
                 sent += 1
             except Exception:
                 log.warning("Could not DM reminder to user %s", user_id)
@@ -930,9 +864,7 @@ class ScoreBot(discord.Client):
 
         content = message.content
         timestamp = (
-            message.created_at.replace(tzinfo=timezone.utc)
-            if message.created_at.tzinfo is None
-            else message.created_at
+            message.created_at.replace(tzinfo=timezone.utc) if message.created_at.tzinfo is None else message.created_at
         )
 
         for parser in self.registry.all_parsers():
@@ -955,9 +887,7 @@ class ScoreBot(discord.Client):
                 if game is None or not game.enabled:
                     break
 
-                duplicate = is_duplicate(
-                    session, result.user_id, result.game_id, result.date
-                )
+                duplicate = is_duplicate(session, result.user_id, result.game_id, result.date)
                 if not duplicate:
                     game_name = game.name
                     submission = record_submission(session, result, username)
@@ -969,12 +899,7 @@ class ScoreBot(discord.Client):
                         session, result.user_id, result.game_id, result.date
                     )
                     enabled_count = (
-                        session.scalar(
-                            select(func.count())
-                            .select_from(Game)
-                            .where(Game.enabled.is_(True))
-                        )
-                        or 0
+                        session.scalar(select(func.count()).select_from(Game).where(Game.enabled.is_(True))) or 0
                     )
                     new_achievements = check_and_award_achievements(
                         session,
@@ -1008,9 +933,7 @@ class ScoreBot(discord.Client):
                                 f"{'s' if user_streak.freeze_count != 1 else ''} remaining."
                             )
                         except Exception:
-                            log.warning(
-                                "Could not DM freeze notification to %s", result.user_id
-                            )
+                            log.warning("Could not DM freeze notification to %s", result.user_id)
 
                     for slug in new_achievements:
                         ach = ACHIEVEMENTS.get(slug)
@@ -1018,8 +941,7 @@ class ScoreBot(discord.Client):
                             try:
                                 dm_user = await self.fetch_user(int(result.user_id))
                                 await dm_user.send(
-                                    f"🏆 Achievement unlocked: **{ach.icon} {ach.name}**\n"
-                                    f"_{ach.description}_"
+                                    f"🏆 Achievement unlocked: **{ach.icon} {ach.name}**\n_{ach.description}_"
                                 )
                             except Exception:
                                 log.warning(

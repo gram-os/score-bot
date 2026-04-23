@@ -18,9 +18,7 @@ from bot.parsers.base import ParseResult
 TODAY = date(2024, 1, 15)
 
 
-def _make_result(
-    user_id: str, base_score: float = 75.0, game_id: str = "wordle"
-) -> ParseResult:
+def _make_result(user_id: str, base_score: float = 75.0, game_id: str = "wordle") -> ParseResult:
     return ParseResult(
         game_id=game_id,
         user_id=user_id,
@@ -178,23 +176,15 @@ class TestAddSubmissionManual:
 
 class TestGetLeaderboard:
     def test_alltime_returns_all_users(self, session, wordle_game):
-        record_submission(
-            session, _make_result("user1", base_score=100.0), username="Alice"
-        )
-        record_submission(
-            session, _make_result("user2", base_score=80.0), username="Bob"
-        )
+        record_submission(session, _make_result("user1", base_score=100.0), username="Alice")
+        record_submission(session, _make_result("user2", base_score=80.0), username="Bob")
 
         rows = get_leaderboard(session, "alltime")
         assert len(rows) == 2
 
     def test_alltime_ordered_by_total_score_desc(self, session, wordle_game):
-        record_submission(
-            session, _make_result("user1", base_score=100.0), username="Alice"
-        )
-        record_submission(
-            session, _make_result("user2", base_score=80.0), username="Bob"
-        )
+        record_submission(session, _make_result("user1", base_score=100.0), username="Alice")
+        record_submission(session, _make_result("user2", base_score=80.0), username="Bob")
 
         rows = get_leaderboard(session, "alltime")
         # user1 has higher base + higher speed bonus (submitted first)
@@ -202,20 +192,14 @@ class TestGetLeaderboard:
         assert rows[1].username == "Bob"
 
     def test_ranks_are_sequential(self, session, wordle_game):
-        record_submission(
-            session, _make_result("user1", base_score=100.0), username="Alice"
-        )
-        record_submission(
-            session, _make_result("user2", base_score=80.0), username="Bob"
-        )
+        record_submission(session, _make_result("user1", base_score=100.0), username="Alice")
+        record_submission(session, _make_result("user2", base_score=80.0), username="Bob")
 
         rows = get_leaderboard(session, "alltime")
         assert [r.rank for r in rows] == [1, 2]
 
     def test_submission_count_is_correct(self, session, wordle_game):
-        record_submission(
-            session, _make_result("user1", base_score=75.0), username="Alice"
-        )
+        record_submission(session, _make_result("user1", base_score=75.0), username="Alice")
 
         rows = get_leaderboard(session, "alltime")
         alice = next(r for r in rows if r.username == "Alice")
@@ -231,9 +215,7 @@ class TestGetLeaderboard:
         session.add(glyph_game)
         session.flush()
 
-        record_submission(
-            session, _make_result("user1", game_id="wordle"), username="Alice"
-        )
+        record_submission(session, _make_result("user1", game_id="wordle"), username="Alice")
         record_submission(
             session,
             ParseResult(

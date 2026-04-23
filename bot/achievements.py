@@ -22,12 +22,8 @@ ACHIEVEMENTS: dict[str, AchievementDef] = {
     for a in [
         AchievementDef("first_steps", "First Steps", "Submit your first score", "🎯"),
         AchievementDef("on_fire", "On Fire", "Reach a 7-day streak on any game", "🔥"),
-        AchievementDef(
-            "dedicated", "Dedicated", "Reach a 30-day streak on any game", "💪"
-        ),
-        AchievementDef(
-            "unstoppable", "Unstoppable", "Reach a 100-day streak on any game", "⚡"
-        ),
+        AchievementDef("dedicated", "Dedicated", "Reach a 30-day streak on any game", "💪"),
+        AchievementDef("unstoppable", "Unstoppable", "Reach a 100-day streak on any game", "⚡"),
         AchievementDef("century", "Century", "Submit 100 total scores", "💯"),
         AchievementDef("veteran", "Veteran", "Submit 500 total scores", "🏅"),
         AchievementDef(
@@ -42,9 +38,7 @@ ACHIEVEMENTS: dict[str, AchievementDef] = {
             "Earn the 1st-place speed bonus 25 times",
             "🏎️",
         ),
-        AchievementDef(
-            "hat_trick", "Hat Trick", "Submit to 3 different games in one day", "🎩"
-        ),
+        AchievementDef("hat_trick", "Hat Trick", "Submit to 3 different games in one day", "🎩"),
         AchievementDef(
             "completionist",
             "Completionist",
@@ -81,11 +75,7 @@ def check_and_award_achievements(
     from bot.database import UserAchievement
 
     earned = set(
-        session.scalars(
-            select(UserAchievement.achievement_slug).where(
-                UserAchievement.user_id == user_id
-            )
-        ).all()
+        session.scalars(select(UserAchievement.achievement_slug).where(UserAchievement.user_id == user_id)).all()
     )
 
     newly_earned: list[str] = []
@@ -103,12 +93,7 @@ def check_and_award_achievements(
             newly_earned.append(slug)
             earned.add(slug)
 
-    total_count = (
-        session.scalar(
-            select(func.count()).select_from(Sub).where(Sub.user_id == user_id)
-        )
-        or 0
-    )
+    total_count = session.scalar(select(func.count()).select_from(Sub).where(Sub.user_id == user_id)) or 0
 
     if total_count == 1:
         award("first_steps")
@@ -128,9 +113,7 @@ def check_and_award_achievements(
         award("speed_demon")
         first_count = (
             session.scalar(
-                select(func.count())
-                .select_from(Sub)
-                .where(Sub.user_id == user_id, Sub.submission_rank == 1)
+                select(func.count()).select_from(Sub).where(Sub.user_id == user_id, Sub.submission_rank == 1)
             )
             or 0
         )

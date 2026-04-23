@@ -22,6 +22,22 @@
   </div>
 </div>
 
+<h3 style="margin-bottom:12px;">Achievements</h3>
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;">
+  {% for a in achievements %}
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);opacity:{% if a.earned %}1{% else %}0.4{% endif %};" title="{{ a.description }}{% if a.earned %} — earned {{ a.earned_at.strftime('%Y-%m-%d') if a.earned_at else '' }}{% endif %}">
+    <span style="font-size:20px;">{{ a.icon }}</span>
+    <div>
+      <div style="font-size:13px;font-weight:600;">{{ a.name }}</div>
+      <div style="font-size:11px;color:var(--text-muted);">{{ a.description }}</div>
+      {% if a.earned and a.earned_at %}
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">{{ a.earned_at.strftime('%Y-%m-%d') }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
 {% if submissions %}
 <table>
   <thead>

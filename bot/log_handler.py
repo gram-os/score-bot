@@ -5,6 +5,11 @@ from sqlalchemy.orm import sessionmaker
 
 _INCLUDED_PREFIXES = ("bot.", "web.", "discord")
 
+_EXCLUDED_SUBSTRINGS = (
+    "has connected to Gateway",
+    "session has been invalidated",
+)
+
 
 class DBLogHandler(logging.Handler):
     def __init__(self, engine):
@@ -16,6 +21,9 @@ class DBLogHandler(logging.Handler):
         if self._emitting:
             return
         if not any(record.name.startswith(p) for p in _INCLUDED_PREFIXES):
+            return
+        message = record.getMessage()
+        if any(s in message for s in _EXCLUDED_SUBSTRINGS):
             return
         self._emitting = True
         try:
