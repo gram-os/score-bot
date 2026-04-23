@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import date as date_type, timedelta
 
@@ -20,9 +21,12 @@ from bot.database import (
     delete_submission,
     get_engine,
     get_leaderboard,
+    get_logs,
     get_users_summary,
     recalculate_game_ranks,
 )
+
+log = logging.getLogger(__name__)
 
 config = Config(environ=os.environ)
 
@@ -88,6 +92,7 @@ async def callback(request: Request):
     username = user.get("username", user_id)
 
     if user_id not in _admin_ids():
+        log.warning("Unauthorized login attempt by %s (id=%s)", username, user_id)
         return HTMLResponse(
             content=f"<h1>403 Forbidden</h1><p>Discord ID {user_id} is not authorized.</p>",
             status_code=403,
@@ -95,11 +100,14 @@ async def callback(request: Request):
 
     request.session["user_id"] = user_id
     request.session["username"] = username
+    log.info("Admin login: %s (id=%s)", username, user_id)
     return RedirectResponse(url="/admin", status_code=302)
 
 
 @router.get("/logout")
 async def logout(request: Request):
+    username = request.session.get("username", "unknown")
+    log.info("Admin logout: %s", username)
     request.session.clear()
     return RedirectResponse(url="/", status_code=302)
 
@@ -183,6 +191,7 @@ async def submission_delete(
         db.commit()
     finally:
         db.close()
+    log.info("Admin %s deleted submission #%d", session["username"], submission_id)
     request.session["flash"] = f"Submission #{submission_id} deleted."
     return RedirectResponse(url="/admin/submissions", status_code=303)
 
@@ -244,6 +253,14 @@ async def submission_new_submit(
         db.commit()
     finally:
         db.close()
+    log.info(
+        "Admin %s added submission: user=%s game=%s date=%s score=%s",
+        session["username"],
+        username,
+        game_id,
+        date,
+        base_score,
+    )
     request.session["flash"] = f"Submission added for {username}."
     return RedirectResponse(url="/admin/submissions", status_code=303)
 
@@ -291,6 +308,12 @@ async def game_recalculate(
         db.commit()
     finally:
         db.close()
+    log.info(
+        "Admin %s recalculated ranks for %s (%d date(s))",
+        session["username"],
+        game_id,
+        affected,
+    )
     request.session["flash"] = (
         f"Recalculated scores across {affected} date(s) for {game_id}."
     )
@@ -310,6 +333,7 @@ async def game_toggle(
             game.enabled = not game.enabled
             db.commit()
             state = "enabled" if game.enabled else "disabled"
+            log.info("Admin %s %s game %s", session["username"], state, game_id)
             request.session["flash"] = f"{game.name} {state}."
     finally:
         db.close()
@@ -573,6 +597,13 @@ async def tools_bulk_delete(
         db.commit()
     finally:
         db.close()
+    log.info(
+        "Admin %s bulk-deleted %d submission(s) for %s on %s",
+        session["username"],
+        count,
+        game_id,
+        date,
+    )
     request.session["flash"] = f"Deleted {count} submission(s) for {game_id} on {date}."
     return RedirectResponse(url="/admin/tools", status_code=303)
 
@@ -626,6 +657,53 @@ async def user_detail(
             "submissions": submissions,
             "total_score": total_score,
             "games_played": games_played,
+        },
+    )
+
+
+@admin_router.get("/logs")
+async def logs_view(
+    request: Request,
+    level: str = "",
+    search: str = "",
+    logger: str = "",
+    page: int = 1,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        rows, total = get_logs(
+            db,
+            level=level or None,
+            logger_filter=logger or None,
+            search=search or None,
+            limit=PAGE_SIZE,
+            offset=(page - 1) * PAGE_SIZE,
+        )
+    finally:
+        db.close()
+
+    def page_url(p: int) -> str:
+        params = f"?page={p}"
+        if level:
+            params += f"&level={level}"
+        if search:
+            params += f"&search={search}"
+        if logger:
+            params += f"&logger={logger}"
+        return f"/admin/logs{params}"
+
+    return templates.TemplateResponse(
+        request,
+        "logs.html",
+        {
+            "active": "logs",
+            "logs": rows,
+            "filters": {"level": level, "search": search, "logger": logger},
+            "page": page,
+            "has_next": (page * PAGE_SIZE) < total,
+            "total": total,
+            "page_url": page_url,
         },
     )
 

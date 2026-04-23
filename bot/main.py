@@ -33,6 +33,7 @@ from bot.database import (
     record_submission,
     set_preference,
 )
+from bot.log_handler import setup_db_logging
 from bot.parsers.registry import ParserRegistry
 
 load_dotenv()
@@ -97,6 +98,7 @@ class ScoreBot(discord.Client):
 
         engine = get_engine(DATABASE_PATH)
         self.Session = sessionmaker(bind=engine)
+        setup_db_logging(engine)
 
         self._scheduler = AsyncIOScheduler()
         self._register_commands()
@@ -157,6 +159,12 @@ class ScoreBot(discord.Client):
                     )
                 embed.description = "\n".join(lines)
 
+            log.info(
+                "/leaderboard by %s (game=%s, period=%s)",
+                interaction.user.display_name,
+                game_id,
+                period_value,
+            )
             await interaction.response.send_message(embed=embed)
 
         @self.tree.command(name="games", description="List enabled games")
@@ -217,6 +225,7 @@ class ScoreBot(discord.Client):
                     description=description,
                 )
                 session.commit()
+                log.info("/suggest by %s: %s", interaction.user.display_name, game_name)
 
             await interaction.response.send_message(
                 f"✅ **{game_name}** has been added to the suggestion list and will "
@@ -382,6 +391,10 @@ class ScoreBot(discord.Client):
                 if threshold == 0 or currently_opted_in:
                     set_preference(session, user_id, remind_streak_days=0)
                     session.commit()
+                    log.info(
+                        "/remind: %s opted out of streak reminders",
+                        interaction.user.display_name,
+                    )
                     await interaction.response.send_message(
                         "Streak reminders **disabled**. You won't receive reminder DMs.",
                         ephemeral=True,
@@ -389,6 +402,11 @@ class ScoreBot(discord.Client):
                 else:
                     set_preference(session, user_id, remind_streak_days=threshold)
                     session.commit()
+                    log.info(
+                        "/remind: %s opted in (threshold=%d)",
+                        interaction.user.display_name,
+                        threshold,
+                    )
                     await interaction.response.send_message(
                         f"Streak reminders **enabled** — you'll be reminded when your streak reaches "
                         f"**{threshold}** days.",
@@ -636,6 +654,7 @@ class ScoreBot(discord.Client):
                 )
         embed.description = "\n".join(lines)
         await channel.send(embed=embed)
+        log.info("Daily digest sent for %s", yesterday)
 
     async def _send_streak_reminders(self) -> None:
         today = datetime.datetime.now(datetime.timezone.utc).date()
@@ -660,6 +679,7 @@ class ScoreBot(discord.Client):
                 if qualifying_games:
                     reminders[pref.user_id] = qualifying_games
 
+        sent = 0
         for user_id, game_names in reminders.items():
             try:
                 user = await self.fetch_user(int(user_id))
@@ -667,8 +687,11 @@ class ScoreBot(discord.Client):
                 await user.send(
                     f"Don't break your streak! You haven't submitted today for: {games_list}"
                 )
+                sent += 1
             except Exception:
                 log.warning("Could not DM reminder to user %s", user_id)
+        if sent:
+            log.info("Sent streak reminders to %d user(s)", sent)
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot:
@@ -689,6 +712,11 @@ class ScoreBot(discord.Client):
 
             result = parser.parse(content, str(message.author.id), timestamp)
             if result is None:
+                log.warning(
+                    "Parser %s matched but returned None for %s",
+                    parser.game_id,
+                    message.author.display_name,
+                )
                 break
 
             username = message.author.display_name
@@ -706,6 +734,13 @@ class ScoreBot(discord.Client):
                     record_submission(session, result, username)
                     session.commit()
                     streak = get_streak(session, result.user_id, result.game_id)
+                    log.info(
+                        "Recorded %s for %s: base=%s total=%s",
+                        result.game_id,
+                        username,
+                        result.base_score,
+                        result.base_score,
+                    )
                     await message.add_reaction(parser.reaction)
                     if streak >= 3:
                         await message.channel.send(
@@ -713,6 +748,12 @@ class ScoreBot(discord.Client):
                             reference=message,
                         )
                 else:
+                    log.warning(
+                        "Duplicate %s submission from %s on %s",
+                        result.game_id,
+                        username,
+                        result.date,
+                    )
                     await message.add_reaction("⚠️")
             break
 

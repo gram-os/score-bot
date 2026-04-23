@@ -119,6 +119,18 @@ class GameSuggestion(Base):
     )
 
 
+class AppLog(Base):
+    __tablename__ = "app_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    level: Mapped[str] = mapped_column(String, nullable=False)
+    logger: Mapped[str] = mapped_column(String, nullable=False)
+    message: Mapped[str] = mapped_column(String, nullable=False)
+
+
 def get_engine(db_path: str | None = None):
     path = db_path or os.environ.get("DATABASE_PATH", "/data/scores.db")
     return create_engine(f"sqlite:///{path}")
@@ -700,3 +712,35 @@ def set_preference(
         pref.remind_streak_days = remind_streak_days
     session.flush()
     return pref
+
+
+# ---------------------------------------------------------------------------
+# Log queries
+# ---------------------------------------------------------------------------
+
+
+def get_logs(
+    session: Session,
+    level: str | None = None,
+    logger_filter: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[list[AppLog], int]:
+    filters = []
+    if level:
+        filters.append(AppLog.level == level)
+    if logger_filter:
+        filters.append(AppLog.logger.ilike(f"%{logger_filter}%"))
+    if search:
+        filters.append(AppLog.message.ilike(f"%{search}%"))
+
+    count_stmt = select(func.count()).select_from(AppLog)
+    data_stmt = select(AppLog).order_by(AppLog.timestamp.desc())
+    if filters:
+        count_stmt = count_stmt.where(*filters)
+        data_stmt = data_stmt.where(*filters)
+
+    total = session.scalar(count_stmt) or 0
+    rows = session.execute(data_stmt.offset(offset).limit(limit)).scalars().all()
+    return rows, total
