@@ -32,6 +32,7 @@ from bot.database import (
     get_streak,
     get_unpolled_suggestions,
     get_user_achievements,
+    get_user_best_streaks,
     get_user_streak,
     get_weekly_digest,
     get_yesterday_digest,
@@ -491,16 +492,18 @@ class ScoreBot(discord.Client):
                 season = get_current_season(session)
                 season_label = season.name if season else None
 
+                best_current, best_ever = get_user_best_streaks(session, target_id)
                 user_achievements = get_user_achievements(session, target_id)
 
             earned_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
             total_achievements = len(ACHIEVEMENTS)
+            avg_score = total_pts / total_subs if total_subs else 0.0
 
             rank_str = f"#{overall_rank}" if overall_rank else "Unranked"
             subtitle_parts = []
             if season_label:
                 subtitle_parts.append(season_label)
-            subtitle_parts.append(f"{rank_str} · {total_pts:.0f} pts · {total_subs} submissions")
+            subtitle_parts.append(rank_str)
 
             embed = discord.Embed(
                 title=f"🎮  {target.display_name}'s Score Card",
@@ -508,6 +511,19 @@ class ScoreBot(discord.Client):
                 color=discord.Color.gold(),
             )
             embed.set_thumbnail(url=target.display_avatar.url)
+
+            embed.add_field(
+                name="📊 Stats",
+                value=f"{total_pts:.0f} pts  ·  {total_subs} submissions  ·  {avg_score:.1f} avg",
+                inline=False,
+            )
+
+            streak_current = f"🔥 {best_current} days" if best_current else "—"
+            embed.add_field(
+                name="🔥 Streaks",
+                value=f"Current: {streak_current}  ·  Best Ever: {best_ever} days",
+                inline=False,
+            )
 
             if user_achievements:
                 badge_parts = []
