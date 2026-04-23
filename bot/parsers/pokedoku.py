@@ -4,21 +4,22 @@ from datetime import datetime
 
 from .base import GameParser, ParseResult
 
-_PATTERN = re.compile(r"TimeGuessr #(\d+) ([\d,]+)/50,000")
+_PATTERN = re.compile(r"PokeDoku\b.*?Score:\s*(\d)/9", re.DOTALL)
+_UNIQUENESS_PATTERN = re.compile(r"Uniqueness:\s*(\d+)/(\d+)")
 
 
-class TimeGuessrParser(GameParser):
+class PokeDokuParser(GameParser):
     @property
     def game_id(self) -> str:
-        return "time_guessr"
+        return "pokedoku"
 
     @property
     def game_name(self) -> str:
-        return "Time Guessr"
+        return "PokéDoku"
 
     @property
     def reaction(self) -> str:
-        return "⏰"
+        return "⛔️"
 
     def can_parse(self, message: str) -> bool:
         return bool(_PATTERN.search(message))
@@ -30,18 +31,20 @@ class TimeGuessrParser(GameParser):
         if not m:
             return None
 
-        puzzle_number = int(m.group(1))
-        raw_score = int(m.group(2).replace(",", ""))
-        base_score = float(math.ceil(raw_score * 100 / 50_000))
+        score = int(m.group(1))
+        base_score = float(math.ceil(score * 100 / 9))
+
+        raw_data: dict = {"score": score, "max_score": 9}
+
+        um = _UNIQUENESS_PATTERN.search(message)
+        if um:
+            raw_data["uniqueness"] = int(um.group(1))
+            raw_data["uniqueness_max"] = int(um.group(2))
 
         return ParseResult(
             game_id=self.game_id,
             user_id=user_id,
             date=timestamp.date(),
             base_score=base_score,
-            raw_data={
-                "puzzle_number": puzzle_number,
-                "raw_score": raw_score,
-                "max_score": 50_000,
-            },
+            raw_data=raw_data,
         )
