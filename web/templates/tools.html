@@ -77,6 +77,56 @@
 </div>
 
 <div class="tool-section">
+  <h3>Backfill from Discord</h3>
+  <p class="tool-desc">Fetch message history from the Discord channel for a date range and record any submissions the bot missed. Duplicates are skipped automatically.</p>
+  <form method="post" action="/admin/tools/backfill">
+    <div class="tool-form-row">
+      <label style="font-size:13px;">From</label>
+      <input type="date" name="start_date" required>
+      <label style="font-size:13px;">To</label>
+      <input type="date" name="end_date" required>
+      <button type="submit" class="btn btn-primary">Run Backfill</button>
+    </div>
+  </form>
+
+  {% if backfill_result is not none %}
+  <div style="margin-top:16px;">
+    <p style="font-size:13px;color:var(--text-muted);">
+      Scanned <strong>{{ backfill_result.messages_scanned }}</strong> messages
+      {% if backfill_range %}({{ backfill_range }}){% endif %} —
+      <strong style="color:var(--c-success);">{{ backfill_result.recorded | length }} recorded</strong>,
+      {{ backfill_result.duplicates | length }} skipped (duplicate),
+      {{ backfill_result.errors | length }} errors
+    </p>
+
+    {% if backfill_result.recorded %}
+    <table style="margin-top:10px;width:auto;">
+      <thead><tr><th>User</th><th>Game</th><th>Date</th><th>Score</th></tr></thead>
+      <tbody>
+        {% for row in backfill_result.recorded %}
+        <tr>
+          <td>{{ row.username }}</td>
+          <td>{{ row.game_name }}</td>
+          <td>{{ row.date }}</td>
+          <td>{{ row.base_score | int }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if backfill_result.errors %}
+    <div style="margin-top:10px;">
+      {% for err in backfill_result.errors %}
+      <p style="font-size:12px;color:var(--c-danger);">{{ err }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="tool-section">
   <h3>Bulk Delete Submissions</h3>
   <p class="tool-desc">Delete all submissions for a specific game on a specific date. This cannot be undone.</p>
   <form method="post" action="/admin/tools/bulk-delete"
