@@ -7,9 +7,7 @@ TIMESTAMP = datetime(2024, 1, 15, 12, 0, 0)
 
 QUORDLE_LOW = "Daily Quordle #100\n2️⃣1️⃣\n1️⃣2️⃣"  # total=6 → score=80
 QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"  # total=35 → clamped to 0
-QUORDLE_FAIL = (
-    "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"  # 9+2+3+4=18 → score=0 (clamped); failed=True
-)
+QUORDLE_FAIL = "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"  # 9+2+3+4=18 → score=0 (clamped); failed=True
 QUORDLE_MID = "Daily Quordle #400\n4️⃣5️⃣\n6️⃣7️⃣"  # total=22 → max(0,100-180)=0
 
 

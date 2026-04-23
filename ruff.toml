@@ -1,0 +1,8 @@
+line-length = 120
+exclude = ["alembic/", ".venv", ".sudocode"]
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E203"]
+
+[format]

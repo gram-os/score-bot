@@ -20,11 +20,8 @@ jobs:
         run: |
           pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Lint (flake8)
-        run: flake8 .
-
-      - name: Format check (black)
-        run: black --check . --exclude '(.venv|.sudocode)'
+      - name: Ruff 
+        run: ruff check .
 
       - name: Run tests
         run: pytest -v

@@ -28,6 +28,7 @@
   <div class="filter-group" style="justify-content: flex-end;">
     <button type="submit" class="btn btn-primary">Filter</button>
     <a href="/admin/submissions" class="btn btn-secondary" style="margin-left:6px; text-decoration:none; line-height:1.6;">Clear</a>
+    <a id="export-link" href="/admin/submissions/export{% if filters.game or filters.user or filters.date %}?{% if filters.game %}game={{ filters.game }}{% endif %}{% if filters.user %}{% if filters.game %}&{% endif %}user={{ filters.user }}{% endif %}{% if filters.date %}{% if filters.game or filters.user %}&{% endif %}date={{ filters.date }}{% endif %}{% endif %}" class="btn btn-secondary" style="margin-left:6px; text-decoration:none; line-height:1.6;">⬇ Export CSV</a>
   </div>
 </form>
 

@@ -1,17 +1,26 @@
+import csv
+import io
 import json
 import logging
 import os
-from datetime import date as date_type, timedelta
+from datetime import date as date_type, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.config import Config
 
+from bot.achievements import ACHIEVEMENTS
 from bot.database import (
     Game,
     GameSuggestion,
@@ -19,11 +28,14 @@ from bot.database import (
     add_submission_manual,
     bulk_delete_submissions,
     delete_submission,
+    get_config,
     get_engine,
     get_leaderboard,
     get_logs,
+    get_user_achievements,
     get_users_summary,
     recalculate_game_ranks,
+    set_config,
 )
 
 log = logging.getLogger(__name__)
@@ -71,9 +83,7 @@ async def require_admin(request: Request) -> dict:
 
 @router.get("/login")
 async def login(request: Request):
-    redirect_uri = os.environ.get(
-        "DISCORD_REDIRECT_URI", str(request.url_for("callback"))
-    )
+    redirect_uri = os.environ.get("DISCORD_REDIRECT_URI", str(request.url_for("callback")))
     return await oauth.discord.authorize_redirect(request, redirect_uri)
 
 
@@ -179,6 +189,71 @@ async def submissions_list(
     )
 
 
+@admin_router.get("/submissions/export")
+async def submissions_export(
+    request: Request,
+    game: str = "",
+    user: str = "",
+    date: str = "",
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        filters_list = []
+        if game:
+            filters_list.append(Submission.game_id == game)
+        if user:
+            filters_list.append(Submission.username.ilike(f"%{user}%"))
+        if date:
+            filters_list.append(Submission.date == date)
+
+        stmt = select(Submission, Game.name.label("game_name")).join(Game, Submission.game_id == Game.id)
+        if filters_list:
+            stmt = stmt.where(*filters_list)
+        stmt = stmt.order_by(Submission.submitted_at.desc())
+        rows = db.execute(stmt).all()
+    finally:
+        db.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "id",
+            "username",
+            "game",
+            "date",
+            "base_score",
+            "speed_bonus",
+            "total_score",
+            "submission_rank",
+            "submitted_at",
+        ]
+    )
+    for sub, game_name in rows:
+        writer.writerow(
+            [
+                sub.id,
+                sub.username,
+                game_name,
+                sub.date,
+                sub.base_score,
+                sub.speed_bonus,
+                sub.total_score,
+                sub.submission_rank,
+                sub.submitted_at,
+            ]
+        )
+
+    output.seek(0)
+    filename = "submissions.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @admin_router.post("/submissions/{submission_id}/delete")
 async def submission_delete(
     request: Request,
@@ -247,9 +322,7 @@ async def submission_new_submit(
                 status_code=422,
             )
         submission_date = date_type.fromisoformat(date)
-        add_submission_manual(
-            db, user_id, username, game_id, submission_date, base_score, parsed_raw
-        )
+        add_submission_manual(db, user_id, username, game_id, submission_date, base_score, parsed_raw)
         db.commit()
     finally:
         db.close()
@@ -276,9 +349,7 @@ async def games_list(
         counts = {
             row.game_id: row.count
             for row in db.execute(
-                select(
-                    Submission.game_id, func.count(Submission.id).label("count")
-                ).group_by(Submission.game_id)
+                select(Submission.game_id, func.count(Submission.id).label("count")).group_by(Submission.game_id)
             ).all()
         }
     finally:
@@ -314,9 +385,7 @@ async def game_recalculate(
         game_id,
         affected,
     )
-    request.session["flash"] = (
-        f"Recalculated scores across {affected} date(s) for {game_id}."
-    )
+    request.session["flash"] = f"Recalculated scores across {affected} date(s) for {game_id}."
     return RedirectResponse(url="/admin/games", status_code=303)
 
 
@@ -645,8 +714,24 @@ async def user_detail(
         username = submissions[0].username if submissions else user_id
         total_score = sum(s.total_score for s in submissions)
         games_played = sorted({s.game_id for s in submissions})
+        user_achievements = get_user_achievements(db, user_id)
     finally:
         db.close()
+
+    earned_slugs = {ua.achievement_slug for ua in user_achievements}
+    earned_at_by_slug = {ua.achievement_slug: ua.earned_at for ua in user_achievements}
+    achievements = [
+        {
+            "slug": slug,
+            "name": defn.name,
+            "description": defn.description,
+            "icon": defn.icon,
+            "earned": slug in earned_slugs,
+            "earned_at": earned_at_by_slug.get(slug),
+        }
+        for slug, defn in ACHIEVEMENTS.items()
+    ]
+
     return templates.TemplateResponse(
         request,
         "user_detail.html",
@@ -657,8 +742,52 @@ async def user_detail(
             "submissions": submissions,
             "total_score": total_score,
             "games_played": games_played,
+            "achievements": achievements,
         },
     )
+
+
+_DISPLAY_TIMEZONES = [
+    ("UTC", "UTC"),
+    ("America/New_York", "Eastern Time (ET)"),
+    ("America/Chicago", "Central Time (CT)"),
+    ("America/Denver", "Mountain Time (MT)"),
+    ("America/Los_Angeles", "Pacific Time (PT)"),
+    ("America/Anchorage", "Alaska Time (AKT)"),
+    ("Pacific/Honolulu", "Hawaii Time (HT)"),
+    ("America/Phoenix", "Arizona (MST, no DST)"),
+    ("Europe/London", "London (GMT/BST)"),
+    ("Europe/Paris", "Paris (CET/CEST)"),
+    ("Europe/Berlin", "Berlin (CET/CEST)"),
+    ("Asia/Tokyo", "Tokyo (JST)"),
+    ("Asia/Singapore", "Singapore (SGT)"),
+    ("Asia/Seoul", "Seoul (KST)"),
+    ("Asia/Shanghai", "Shanghai (CST)"),
+    ("Australia/Sydney", "Sydney (AEST/AEDT)"),
+]
+
+
+def _get_display_tz(db) -> ZoneInfo:
+    tz_name = get_config(db, "display_timezone", "America/New_York")
+    try:
+        return ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, KeyError):
+        return ZoneInfo("America/New_York")
+
+
+def _convert_log_timestamps(rows, tz: ZoneInfo) -> list[dict]:
+    result = []
+    for entry in rows:
+        ts = entry.timestamp.replace(tzinfo=timezone.utc).astimezone(tz)
+        result.append(
+            {
+                "timestamp_str": ts.strftime("%Y-%m-%d %H:%M:%S"),
+                "level": entry.level,
+                "logger": entry.logger,
+                "message": entry.message,
+            }
+        )
+    return result
 
 
 @admin_router.get("/logs")
@@ -680,8 +809,11 @@ async def logs_view(
             limit=PAGE_SIZE,
             offset=(page - 1) * PAGE_SIZE,
         )
+        tz = _get_display_tz(db)
     finally:
         db.close()
+
+    tz_label = str(tz)
 
     def page_url(p: int) -> str:
         params = f"?page={p}"
@@ -698,7 +830,8 @@ async def logs_view(
         "logs.html",
         {
             "active": "logs",
-            "logs": rows,
+            "logs": _convert_log_timestamps(rows, tz),
+            "tz_label": tz_label,
             "filters": {"level": level, "search": search, "logger": logger},
             "page": page,
             "has_next": (page * PAGE_SIZE) < total,
@@ -706,6 +839,54 @@ async def logs_view(
             "page_url": page_url,
         },
     )
+
+
+@admin_router.get("/config")
+async def config_view(
+    request: Request,
+    saved: str = "",
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        display_timezone = get_config(db, "display_timezone", "America/New_York")
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request,
+        "config.html",
+        {
+            "active": "config",
+            "display_timezone": display_timezone,
+            "timezones": _DISPLAY_TIMEZONES,
+            "saved": bool(saved),
+        },
+    )
+
+
+@admin_router.post("/config")
+async def config_update(
+    request: Request,
+    display_timezone: str = Form(...),
+    session: dict = Depends(require_admin),
+):
+    valid_zones = {tz for tz, _ in _DISPLAY_TIMEZONES}
+    if display_timezone not in valid_zones:
+        display_timezone = "America/New_York"
+
+    db = _db_session()
+    try:
+        set_config(db, "display_timezone", display_timezone)
+    finally:
+        db.close()
+
+    log.info(
+        "Admin %s updated config: display_timezone=%s",
+        session["username"],
+        display_timezone,
+    )
+    return RedirectResponse("/admin/config?saved=1", status_code=303)
 
 
 @admin_router.get("/leaderboard")

@@ -51,9 +51,7 @@ class TestEncloseHorseParserParse:
     def test_bonus_round_adds_to_score(self):
         result = self.parser.parse(HORSE_WITH_BONUS, USER_ID, TIMESTAMP)
         # 50% of 15 pts = 7.5 → rounds to 8
-        assert result.raw_data["bonus_rounds"] == [
-            {"variant": "🐎", "pct": 50.0, "pts": 8}
-        ]
+        assert result.raw_data["bonus_rounds"] == [{"variant": "🐎", "pct": 50.0, "pts": 8}]
         assert result.base_score == 75.5 + 8
 
     def test_returns_none_when_no_main_percentage(self):

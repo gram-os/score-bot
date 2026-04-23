@@ -121,6 +121,7 @@ The admin panel is available at [http://localhost:8000](http://localhost:8000).
 | `make migrate` | Run database migrations only |
 | `make shell` | Open a shell inside the bot container |
 | `make clean` | Remove containers, volumes, and the `data/` directory |
+| `make check` | Run `ruff format`, `ruff check`, and `pytest` (run before committing) |
 
 ## Project Structure
 

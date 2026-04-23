@@ -35,7 +35,7 @@
 <table>
   <thead>
     <tr>
-      <th>Timestamp</th>
+      <th>Timestamp ({{ tz_label }})</th>
       <th>Level</th>
       <th>Logger</th>
       <th>Message</th>
@@ -45,7 +45,7 @@
     {% for entry in logs %}
     <tr>
       <td style="white-space:nowrap;color:var(--text-muted);font-size:12px;font-family:monospace">
-        {{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+        {{ entry.timestamp_str }}
       </td>
       <td>
         {% if entry.level == 'ERROR' %}

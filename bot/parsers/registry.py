@@ -20,11 +20,7 @@ class ParserRegistry:
                 continue
             module = importlib.import_module(f"{package}.{module_info.name}")
             for _, obj in inspect.getmembers(module, inspect.isclass):
-                if (
-                    issubclass(obj, GameParser)
-                    and obj is not GameParser
-                    and not inspect.isabstract(obj)
-                ):
+                if issubclass(obj, GameParser) and obj is not GameParser and not inspect.isabstract(obj):
                     instance = obj()
                     self._parsers[instance.game_id] = instance
 

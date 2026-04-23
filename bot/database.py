@@ -18,6 +18,7 @@ from sqlalchemy import (
     func,
     select,
     update,
+    and_,
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import (
@@ -42,13 +43,9 @@ class Game(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    submissions: Mapped[list["Submission"]] = relationship(
-        "Submission", back_populates="game"
-    )
+    submissions: Mapped[list["Submission"]] = relationship("Submission", back_populates="game")
 
 
 class Submission(Base):
@@ -65,9 +62,7 @@ class Submission(Base):
     total_score: Mapped[float] = mapped_column(Float, nullable=False)
     submission_rank: Mapped[int] = mapped_column(Integer, nullable=False)
     raw_data: Mapped[dict] = mapped_column(JSON, nullable=False)
-    submitted_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     game: Mapped["Game"] = relationship("Game", back_populates="submissions")
 
@@ -96,9 +91,7 @@ class DailyPoll(Base):
     is_yes_no: Mapped[bool] = mapped_column(Boolean, nullable=False)
     notified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    suggestions: Mapped[list["GameSuggestion"]] = relationship(
-        "GameSuggestion", back_populates="poll"
-    )
+    suggestions: Mapped[list["GameSuggestion"]] = relationship("GameSuggestion", back_populates="poll")
 
 
 class GameSuggestion(Base):
@@ -110,25 +103,58 @@ class GameSuggestion(Base):
     game_name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     suggested_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    poll_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("daily_polls.id"), nullable=True
-    )
+    poll_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("daily_polls.id"), nullable=True)
 
-    poll: Mapped["DailyPoll | None"] = relationship(
-        "DailyPoll", back_populates="suggestions"
-    )
+    poll: Mapped["DailyPoll | None"] = relationship("DailyPoll", back_populates="suggestions")
+
+
+class UserStreak(Base):
+    __tablename__ = "user_streaks"
+    __table_args__ = (UniqueConstraint("user_id", "game_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    game_id: Mapped[str] = mapped_column(String, ForeignKey("games.id"), nullable=False)
+    current_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    longest_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_submission_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    freeze_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class Season(Base):
+    __tablename__ = "seasons"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class UserAchievement(Base):
+    __tablename__ = "user_achievements"
+    __table_args__ = (UniqueConstraint("user_id", "achievement_slug"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    achievement_slug: Mapped[str] = mapped_column(String, nullable=False)
+    earned_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
 class AppLog(Base):
     __tablename__ = "app_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     level: Mapped[str] = mapped_column(String, nullable=False)
     logger: Mapped[str] = mapped_column(String, nullable=False)
     message: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class AdminConfig(Base):
+    __tablename__ = "admin_config"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(String, nullable=False)
 
 
 def get_engine(db_path: str | None = None):
@@ -152,9 +178,7 @@ def upsert_user(session: Session, user_id: str, username: str) -> None:
     session.flush()
 
 
-def is_duplicate(
-    session: Session, user_id: str, game_id: str, submission_date: date
-) -> bool:
+def is_duplicate(session: Session, user_id: str, game_id: str, submission_date: date) -> bool:
     return (
         session.scalar(
             select(func.count())
@@ -169,9 +193,7 @@ def is_duplicate(
     )
 
 
-def record_submission(
-    session: Session, parse_result, username: str
-) -> "Submission | None":
+def record_submission(session: Session, parse_result, username: str) -> "Submission | None":
     from bot.scoring import assign_submission_rank
 
     upsert_user(session, parse_result.user_id, username)
@@ -243,9 +265,7 @@ def add_submission_manual(
     return submission
 
 
-def bulk_delete_submissions(
-    session: Session, game_id: str, submission_date: date
-) -> int:
+def bulk_delete_submissions(session: Session, game_id: str, submission_date: date) -> int:
     submissions = session.scalars(
         select(Submission).where(
             Submission.game_id == game_id,
@@ -262,9 +282,7 @@ def bulk_delete_submissions(
 def recalculate_game_ranks(session: Session, game_id: str) -> int:
     from bot.scoring import assign_submission_rank
 
-    dates = session.scalars(
-        select(Submission.date).where(Submission.game_id == game_id).distinct()
-    ).all()
+    dates = session.scalars(select(Submission.date).where(Submission.game_id == game_id).distinct()).all()
     for d in dates:
         assign_submission_rank(session, game_id, d)
     return len(dates)
@@ -343,10 +361,15 @@ def _period_bounds(
 
 def get_leaderboard(
     session: Session,
-    period: Literal["daily", "weekly", "monthly", "alltime"],
+    period: Literal["daily", "weekly", "monthly", "alltime", "season"],
     game_id: str | None = None,
 ) -> list[LeaderboardRow]:
-    start, end = _period_bounds(period)
+    if period == "season":
+        season = get_current_season(session)
+        start = season.start_date if season else None
+        end = season.end_date if season else None
+    else:
+        start, end = _period_bounds(period)
 
     stmt = (
         select(
@@ -384,34 +407,113 @@ def get_leaderboard(
 # Streak queries
 # ---------------------------------------------------------------------------
 
+MAX_FREEZES = 3
+
+
+def _is_streak_active(row: "UserStreak") -> bool:
+    """A streak is active if the user submitted today or yesterday."""
+    if row.last_submission_date is None:
+        return False
+    today = datetime.now(timezone.utc).date()
+    return (today - row.last_submission_date).days <= 1
+
 
 def get_streak(session: Session, user_id: str, game_id: str) -> int:
-    today = datetime.now(timezone.utc).date()
-    rows = (
-        session.execute(
-            select(Submission.date)
-            .where(Submission.user_id == user_id, Submission.game_id == game_id)
-            .order_by(Submission.date.desc())
+    row = session.scalar(
+        select(UserStreak).where(
+            UserStreak.user_id == user_id,
+            UserStreak.game_id == game_id,
         )
-        .scalars()
-        .all()
+    )
+    if row is None:
+        return 0
+    return row.current_streak if _is_streak_active(row) else 0
+
+
+def get_user_streak(session: Session, user_id: str, game_id: str) -> "UserStreak | None":
+    return session.scalar(
+        select(UserStreak).where(
+            UserStreak.user_id == user_id,
+            UserStreak.game_id == game_id,
+        )
     )
 
-    if not rows:
-        return 0
 
-    date_set = set(rows)
-    # Allow streak ending today or yesterday (timezone slack)
-    anchor = today if today in date_set else today - timedelta(days=1)
-    if anchor not in date_set:
-        return 0
+def get_all_streaks(session: Session, game_id: str) -> list[tuple[str, str, int]]:
+    today = datetime.now(timezone.utc).date()
+    rows = session.execute(
+        select(
+            UserStreak.user_id,
+            User.username,
+            UserStreak.current_streak,
+            UserStreak.last_submission_date,
+        )
+        .join(User, UserStreak.user_id == User.user_id)
+        .where(UserStreak.game_id == game_id)
+    ).all()
+    results = []
+    for r in rows:
+        days_since = (today - r.last_submission_date).days if r.last_submission_date else 999
+        active = r.current_streak if days_since <= 1 else 0
+        results.append((r.user_id, r.username, active))
+    results.sort(key=lambda x: x[2], reverse=True)
+    return results
 
-    streak = 0
-    current = anchor
-    while current in date_set:
-        streak += 1
-        current -= timedelta(days=1)
-    return streak
+
+def update_streak_on_submission(
+    session: Session, user_id: str, game_id: str, submission_date: date
+) -> tuple["UserStreak", bool]:
+    """Update stored streak state for a new submission. Returns (streak, freeze_used)."""
+    streak = session.scalar(
+        select(UserStreak).where(
+            UserStreak.user_id == user_id,
+            UserStreak.game_id == game_id,
+        )
+    )
+    freeze_used = False
+
+    if streak is None:
+        streak = UserStreak(
+            user_id=user_id,
+            game_id=game_id,
+            current_streak=1,
+            longest_streak=1,
+            last_submission_date=submission_date,
+            freeze_count=0,
+        )
+        session.add(streak)
+        session.flush()
+        return streak, False
+
+    if streak.last_submission_date is None:
+        streak.current_streak = 1
+        streak.longest_streak = max(streak.longest_streak, 1)
+        streak.last_submission_date = submission_date
+        session.flush()
+        return streak, False
+
+    days_gap = (submission_date - streak.last_submission_date).days
+
+    if days_gap <= 0:
+        return streak, False
+    elif days_gap == 1:
+        streak.current_streak += 1
+        if streak.current_streak % 7 == 0 and streak.freeze_count < MAX_FREEZES:
+            streak.freeze_count += 1
+    elif days_gap == 2:
+        if streak.freeze_count > 0:
+            streak.freeze_count -= 1
+            streak.current_streak += 1
+            freeze_used = True
+        else:
+            streak.current_streak = 1
+    else:
+        streak.current_streak = 1
+
+    streak.longest_streak = max(streak.longest_streak, streak.current_streak)
+    streak.last_submission_date = submission_date
+    session.flush()
+    return streak, freeze_used
 
 
 @dataclass
@@ -460,9 +562,7 @@ def get_yesterday_digest(session: Session) -> list["GameDigestData"]:
             GameDigestData(
                 game_id=game.id,
                 game_name=game.name,
-                winner_username=(
-                    winner_user.username if winner_user else subs[0].username
-                ),
+                winner_username=(winner_user.username if winner_user else subs[0].username),
                 winner_score=subs[0].total_score,
                 participant_count=len(subs),
                 top_streak=top_streak,
@@ -472,20 +572,151 @@ def get_yesterday_digest(session: Session) -> list["GameDigestData"]:
     return results
 
 
-def get_all_streaks(session: Session, game_id: str) -> list[tuple[str, str, int]]:
-    rows = session.execute(
-        select(Submission.user_id, User.username)
-        .join(User, Submission.user_id == User.user_id)
-        .where(Submission.game_id == game_id)
-        .distinct()
-    ).all()
+@dataclass
+class WeeklyDigestData:
+    week_start: date
+    week_end: date
+    top_scorer_username: str | None
+    top_scorer_points: float
+    most_active_username: str | None
+    most_active_submissions: int
+    best_single_score: float
+    best_single_username: str | None
+    best_single_game: str | None
+    top_streak_username: str | None
+    top_streak_days: int
+    total_submissions: int
+    unique_players: int
 
-    results = [
-        (user_id, username, get_streak(session, user_id, game_id))
-        for user_id, username in rows
-    ]
-    results.sort(key=lambda x: x[2], reverse=True)
-    return results
+
+def get_weekly_digest(session: Session) -> "WeeklyDigestData":
+    today = datetime.now(timezone.utc).date()
+    # Previous Mon–Sun
+    week_end = today - timedelta(days=today.weekday() + 1)
+    week_start = week_end - timedelta(days=6)
+
+    # Top scorer
+    scorer_row = session.execute(
+        select(User.username, func.sum(Submission.total_score).label("pts"))
+        .join(User, Submission.user_id == User.user_id)
+        .where(Submission.date >= week_start, Submission.date <= week_end)
+        .group_by(Submission.user_id)
+        .order_by(func.sum(Submission.total_score).desc())
+        .limit(1)
+    ).first()
+
+    # Most active
+    active_row = session.execute(
+        select(User.username, func.count(Submission.id).label("cnt"))
+        .join(User, Submission.user_id == User.user_id)
+        .where(Submission.date >= week_start, Submission.date <= week_end)
+        .group_by(Submission.user_id)
+        .order_by(func.count(Submission.id).desc())
+        .limit(1)
+    ).first()
+
+    # Best single score
+    best_sub = session.execute(
+        select(Submission, User.username, Game.name.label("game_name"))
+        .join(User, Submission.user_id == User.user_id)
+        .join(Game, Submission.game_id == Game.id)
+        .where(Submission.date >= week_start, Submission.date <= week_end)
+        .order_by(Submission.total_score.desc())
+        .limit(1)
+    ).first()
+
+    # Top streak (current streaks for all users)
+    streak_row = session.execute(
+        select(User.username, UserStreak.current_streak)
+        .join(User, UserStreak.user_id == User.user_id)
+        .order_by(UserStreak.current_streak.desc())
+        .limit(1)
+    ).first()
+
+    total_subs = (
+        session.scalar(
+            select(func.count())
+            .select_from(Submission)
+            .where(Submission.date >= week_start, Submission.date <= week_end)
+        )
+        or 0
+    )
+
+    unique_players = (
+        session.scalar(
+            select(func.count(distinct(Submission.user_id))).where(
+                Submission.date >= week_start, Submission.date <= week_end
+            )
+        )
+        or 0
+    )
+
+    return WeeklyDigestData(
+        week_start=week_start,
+        week_end=week_end,
+        top_scorer_username=scorer_row.username if scorer_row else None,
+        top_scorer_points=scorer_row.pts if scorer_row else 0.0,
+        most_active_username=active_row.username if active_row else None,
+        most_active_submissions=active_row.cnt if active_row else 0,
+        best_single_score=best_sub[0].total_score if best_sub else 0.0,
+        best_single_username=best_sub.username if best_sub else None,
+        best_single_game=best_sub.game_name if best_sub else None,
+        top_streak_username=streak_row.username if streak_row else None,
+        top_streak_days=streak_row.current_streak if streak_row else 0,
+        total_submissions=total_subs,
+        unique_players=unique_players,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Season queries
+# ---------------------------------------------------------------------------
+
+
+def get_current_season(session: Session) -> "Season | None":
+    today = datetime.now(timezone.utc).date()
+    return session.scalar(select(Season).where(and_(Season.start_date <= today, Season.end_date >= today)))
+
+
+def get_season_ending_yesterday(session: Session) -> "Season | None":
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date()
+    return session.scalar(select(Season).where(Season.end_date == yesterday))
+
+
+# ---------------------------------------------------------------------------
+# Achievement queries
+# ---------------------------------------------------------------------------
+
+
+def get_user_achievements(session: Session, user_id: str) -> list["UserAchievement"]:
+    return list(
+        session.scalars(
+            select(UserAchievement).where(UserAchievement.user_id == user_id).order_by(UserAchievement.earned_at)
+        ).all()
+    )
+
+
+def award_season_champion(session: Session, user_id: str) -> bool:
+    """Award season_champion achievement. Returns True if newly awarded."""
+    from datetime import datetime, timezone
+
+    existing = session.scalar(
+        select(UserAchievement).where(
+            UserAchievement.user_id == user_id,
+            UserAchievement.achievement_slug == "season_champion",
+        )
+    )
+    if existing:
+        return False
+    session.add(
+        UserAchievement(
+            user_id=user_id,
+            achievement_slug="season_champion",
+            earned_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+    )
+    session.flush()
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -502,9 +733,7 @@ class PersonalBests:
     count: int
 
 
-def get_personal_bests(
-    session: Session, user_id: str, game_id: str
-) -> "PersonalBests | None":
+def get_personal_bests(session: Session, user_id: str, game_id: str) -> "PersonalBests | None":
     rows = (
         session.execute(
             select(Submission)
@@ -559,8 +788,7 @@ def get_head_to_head(
         select(caller_sub, opponent_sub)
         .join(
             opponent_sub,
-            (caller_sub.date == opponent_sub.date)
-            & (caller_sub.game_id == opponent_sub.game_id),
+            (caller_sub.date == opponent_sub.date) & (caller_sub.game_id == opponent_sub.game_id),
         )
         .where(
             caller_sub.user_id == caller_id,
@@ -639,11 +867,7 @@ def add_suggestion(
 
 
 def get_unpolled_suggestions(session: Session) -> list[GameSuggestion]:
-    return list(
-        session.execute(
-            select(GameSuggestion).where(GameSuggestion.poll_id.is_(None))
-        ).scalars()
-    )
+    return list(session.execute(select(GameSuggestion).where(GameSuggestion.poll_id.is_(None))).scalars())
 
 
 def create_daily_poll(
@@ -660,11 +884,7 @@ def create_daily_poll(
     )
     session.add(poll)
     session.flush()
-    session.execute(
-        update(GameSuggestion)
-        .where(GameSuggestion.id.in_(suggestion_ids))
-        .values(poll_id=poll.id)
-    )
+    session.execute(update(GameSuggestion).where(GameSuggestion.id.in_(suggestion_ids)).values(poll_id=poll.id))
     return poll
 
 
@@ -690,20 +910,14 @@ def mark_poll_notified(session: Session, poll_id: int) -> None:
 
 
 def get_opted_in_preferences(session: Session) -> list["UserPreference"]:
-    return list(
-        session.execute(
-            select(UserPreference).where(UserPreference.remind_streak_days > 0)
-        ).scalars()
-    )
+    return list(session.execute(select(UserPreference).where(UserPreference.remind_streak_days > 0)).scalars())
 
 
 def get_preference(session: Session, user_id: str) -> "UserPreference | None":
     return session.get(UserPreference, user_id)
 
 
-def set_preference(
-    session: Session, user_id: str, remind_streak_days: int
-) -> "UserPreference":
+def set_preference(session: Session, user_id: str, remind_streak_days: int) -> "UserPreference":
     pref = session.get(UserPreference, user_id)
     if pref is None:
         pref = UserPreference(user_id=user_id, remind_streak_days=remind_streak_days)
@@ -744,3 +958,22 @@ def get_logs(
     total = session.scalar(count_stmt) or 0
     rows = session.execute(data_stmt.offset(offset).limit(limit)).scalars().all()
     return rows, total
+
+
+# ---------------------------------------------------------------------------
+# Admin config
+# ---------------------------------------------------------------------------
+
+
+def get_config(session: Session, key: str, default: str = "") -> str:
+    row = session.get(AdminConfig, key)
+    return row.value if row else default
+
+
+def set_config(session: Session, key: str, value: str) -> None:
+    row = session.get(AdminConfig, key)
+    if row is None:
+        session.add(AdminConfig(key=key, value=value))
+    else:
+        row.value = value
+    session.commit()

@@ -28,8 +28,8 @@ pytest tests/unit/test_parsers.py::TestWordleParser  # single test class
 
 **Linting / formatting:**
 ```bash
-black .
-flake8 .
+ruff format .   # format (replaces black)
+ruff check .    # lint (replaces flake8)
 ```
 
 **Migrations:**
