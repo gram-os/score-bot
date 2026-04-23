@@ -430,6 +430,14 @@ def get_streak(session: Session, user_id: str, game_id: str) -> int:
     return row.current_streak if _is_streak_active(row) else 0
 
 
+def get_user_best_streaks(session: Session, user_id: str) -> tuple[int, int]:
+    """Returns (best active streak, best ever streak) across all games."""
+    rows = session.scalars(select(UserStreak).where(UserStreak.user_id == user_id)).all()
+    best_current = max((r.current_streak for r in rows if _is_streak_active(r)), default=0)
+    best_ever = max((r.longest_streak for r in rows), default=0)
+    return best_current, best_ever
+
+
 def get_user_streak(session: Session, user_id: str, game_id: str) -> "UserStreak | None":
     return session.scalar(
         select(UserStreak).where(

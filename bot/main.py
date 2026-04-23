@@ -32,6 +32,7 @@ from bot.database import (
     get_streak,
     get_unpolled_suggestions,
     get_user_achievements,
+    get_user_best_streaks,
     get_user_streak,
     get_weekly_digest,
     get_yesterday_digest,
@@ -472,6 +473,109 @@ class ScoreBot(discord.Client):
             log.info("/mystats by %s", interaction.user.display_name)
             await interaction.followup.send(embed=embed, ephemeral=True)
 
+        @self.tree.command(name="profile", description="View a player's score card")
+        @app_commands.describe(user="Player to view (defaults to you)")
+        async def profile(
+            interaction: discord.Interaction,
+            user: discord.Member = None,
+        ) -> None:
+            target = user or interaction.user
+            target_id = str(target.id)
+
+            with self.Session() as session:
+                all_rows = get_leaderboard(session, period="alltime")
+                user_row = next((r for r in all_rows if r.user_id == target_id), None)
+                total_pts = user_row.total_score if user_row else 0.0
+                overall_rank = user_row.rank if user_row else None
+                total_subs = user_row.submission_count if user_row else 0
+
+                season = get_current_season(session)
+                season_label = season.name if season else None
+
+                best_current, best_ever = get_user_best_streaks(session, target_id)
+                user_achievements = get_user_achievements(session, target_id)
+
+            earned_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
+            total_achievements = len(ACHIEVEMENTS)
+            avg_score = total_pts / total_subs if total_subs else 0.0
+
+            rank_str = f"#{overall_rank}" if overall_rank else "Unranked"
+            subtitle_parts = []
+            if season_label:
+                subtitle_parts.append(season_label)
+            subtitle_parts.append(rank_str)
+
+            embed = discord.Embed(
+                title=f"🎮  {target.display_name}'s Score Card",
+                description="  ·  ".join(subtitle_parts),
+                color=discord.Color.gold(),
+            )
+            embed.set_thumbnail(url=target.display_avatar.url)
+
+            embed.add_field(
+                name="📊 Stats",
+                value=f"{total_pts:.0f} pts  ·  {total_subs} submissions  ·  {avg_score:.1f} avg",
+                inline=False,
+            )
+
+            streak_current = f"🔥 {best_current} days" if best_current else "—"
+            embed.add_field(
+                name="🔥 Streaks",
+                value=f"Current: {streak_current}  ·  Best Ever: {best_ever} days",
+                inline=False,
+            )
+
+            if user_achievements:
+                badge_parts = []
+                for ua in user_achievements:
+                    ach = ACHIEVEMENTS.get(ua.achievement_slug)
+                    if ach:
+                        badge_parts.append(f"{ach.icon} {ach.name}")
+                ach_value = "  ·  ".join(badge_parts)
+            else:
+                ach_value = "None yet — keep playing!"
+
+            embed.add_field(
+                name=f"🏆 Achievements ({earned_count} / {total_achievements})",
+                value=ach_value,
+                inline=False,
+            )
+
+            log.info("/profile for %s by %s", target.display_name, interaction.user.display_name)
+            await interaction.response.send_message(embed=embed)
+
+        @self.tree.command(name="achievements", description="View all achievements and what they require")
+        @app_commands.describe(user="Player to view (defaults to you)")
+        async def achievements_command(
+            interaction: discord.Interaction,
+            user: discord.Member = None,
+        ) -> None:
+            target = user or interaction.user
+            target_id = str(target.id)
+
+            with self.Session() as session:
+                user_achievements = get_user_achievements(session, target_id)
+
+            earned_slugs = {ua.achievement_slug for ua in user_achievements}
+            total = len(ACHIEVEMENTS)
+            earned_count = len(earned_slugs & ACHIEVEMENTS.keys())
+
+            lines = []
+            for ach in ACHIEVEMENTS.values():
+                if ach.slug in earned_slugs:
+                    lines.append(f"✅ {ach.icon} **{ach.name}** — {ach.description}")
+                else:
+                    lines.append(f"🔒 {ach.icon} **{ach.name}** — {ach.description}")
+
+            embed = discord.Embed(
+                title=f"🏆 {target.display_name}'s Achievements ({earned_count} / {total})",
+                description="\n".join(lines),
+                color=discord.Color.gold(),
+            )
+
+            log.info("/achievements for %s by %s", target.display_name, interaction.user.display_name)
+            await interaction.response.send_message(embed=embed)
+
         @self.tree.command(
             name="remind",
             description="Toggle streak reminders for yourself",
@@ -540,6 +644,8 @@ class ScoreBot(discord.Client):
             embed.add_field(
                 name="Commands",
                 value=(
+                    "`/profile` — public score card with rank and achievements\n"
+                    "`/achievements` — full achievement list with descriptions\n"
                     "`/mystats` — your personal stats, streaks, and achievements\n"
                     "`/leaderboard` — rankings by game and time period\n"
                     "`/best` — personal bests and stats for a game\n"
