@@ -12,7 +12,7 @@ help:
 	@echo "  migrate  Run database migrations only"
 	@echo "  shell    Open a shell inside the bot container"
 	@echo "  clean    Remove containers, volumes, and the data directory"
-	@echo "  check    Run black, flake8, and pytest (run before committing)"
+	@echo "  check    Run ruff format, ruff check, and pytest (run before committing)"
 
 setup:
 	@if [ -f .env ]; then \
@@ -62,8 +62,8 @@ clean:
 	rm -rf data
 
 check:
-	black .
-	flake8 .
+	ruff format .
+	ruff check .
 	pytest
 
 test: test-unit test-integration
