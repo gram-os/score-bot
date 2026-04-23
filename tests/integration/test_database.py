@@ -10,6 +10,7 @@ from bot.database import (
     get_streak,
     is_duplicate,
     record_submission,
+    update_streak_on_submission,
     upsert_user,
 )
 from bot.parsers.base import ParseResult
@@ -276,6 +277,7 @@ def _add(session, user_id, username, days_ago, game_id="wordle"):
     )
     session.add(sub)
     session.flush()
+    update_streak_on_submission(session, user_id, game_id, target_date)
     return sub
 
 
@@ -292,18 +294,19 @@ class TestGetStreak:
         assert get_streak(session, "user1", "wordle") == 1
 
     def test_multi_day_streak(self, session, wordle_game):
-        for d in range(4):
+        # Add oldest first so streak increments correctly
+        for d in range(3, -1, -1):
             _add(session, "user1", "Alice", days_ago=d)
         assert get_streak(session, "user1", "wordle") == 4
 
     def test_broken_streak_resets(self, session, wordle_game):
-        # days 0 and 1 present, day 2 missing, days 3-5 present
-        for d in [0, 1, 3, 4, 5]:
+        # days 5,4,3 present, day 2 missing, days 1,0 present
+        for d in [5, 4, 3, 1, 0]:
             _add(session, "user1", "Alice", days_ago=d)
         assert get_streak(session, "user1", "wordle") == 2
 
     def test_streak_ended_two_days_ago_returns_zero(self, session, wordle_game):
-        # Most recent submission is 2 days ago — outside timezone slack window
+        # Most recent submission is 2 days ago — streak is inactive
         _add(session, "user1", "Alice", days_ago=2)
         assert get_streak(session, "user1", "wordle") == 0
 
@@ -314,7 +317,7 @@ class TestGetStreak:
             enabled=True,
             created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
-        session.add(other_game)
+        session.merge(other_game)
         session.flush()
         _add(session, "user1", "Alice", days_ago=0, game_id="connections")
         assert get_streak(session, "user1", "wordle") == 0
@@ -322,8 +325,8 @@ class TestGetStreak:
 
 class TestGetAllStreaks:
     def test_returns_all_users_sorted_descending(self, session, wordle_game):
-        # Alice: 3-day streak, Bob: 1-day streak
-        for d in range(3):
+        # Alice: 3-day streak (add oldest first), Bob: 1-day streak
+        for d in range(2, -1, -1):
             _add(session, "user1", "Alice", days_ago=d)
         _add(session, "user2", "Bob", days_ago=0)
 

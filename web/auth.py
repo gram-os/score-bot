@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import logging
 import os
@@ -6,7 +8,12 @@ from datetime import date as date_type, timedelta
 import httpx
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -176,6 +183,73 @@ async def submissions_list(
             "page_url": page_url,
             "flash": flash,
         },
+    )
+
+
+@admin_router.get("/submissions/export")
+async def submissions_export(
+    request: Request,
+    game: str = "",
+    user: str = "",
+    date: str = "",
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        filters_list = []
+        if game:
+            filters_list.append(Submission.game_id == game)
+        if user:
+            filters_list.append(Submission.username.ilike(f"%{user}%"))
+        if date:
+            filters_list.append(Submission.date == date)
+
+        stmt = select(Submission, Game.name.label("game_name")).join(
+            Game, Submission.game_id == Game.id
+        )
+        if filters_list:
+            stmt = stmt.where(*filters_list)
+        stmt = stmt.order_by(Submission.submitted_at.desc())
+        rows = db.execute(stmt).all()
+    finally:
+        db.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "id",
+            "username",
+            "game",
+            "date",
+            "base_score",
+            "speed_bonus",
+            "total_score",
+            "submission_rank",
+            "submitted_at",
+        ]
+    )
+    for sub, game_name in rows:
+        writer.writerow(
+            [
+                sub.id,
+                sub.username,
+                game_name,
+                sub.date,
+                sub.base_score,
+                sub.speed_bonus,
+                sub.total_score,
+                sub.submission_rank,
+                sub.submitted_at,
+            ]
+        )
+
+    output.seek(0)
+    filename = "submissions.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

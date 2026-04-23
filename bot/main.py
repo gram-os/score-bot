@@ -9,15 +9,18 @@ from apscheduler.triggers.cron import CronTrigger
 from discord import app_commands
 from discord.ext import tasks
 from dotenv import load_dotenv
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
+from bot.achievements import ACHIEVEMENTS, check_and_award_achievements
 from bot.database import (
     Game,
     add_suggestion,
+    award_season_champion,
     create_daily_poll,
     find_similar_name,
     get_all_streaks,
+    get_current_season,
     get_engine,
     get_head_to_head,
     get_latest_unnotified_poll,
@@ -25,13 +28,18 @@ from bot.database import (
     get_opted_in_preferences,
     get_personal_bests,
     get_preference,
+    get_season_ending_yesterday,
     get_streak,
     get_unpolled_suggestions,
+    get_user_achievements,
+    get_user_streak,
+    get_weekly_digest,
     get_yesterday_digest,
     is_duplicate,
     mark_poll_notified,
     record_submission,
     set_preference,
+    update_streak_on_submission,
 )
 from bot.log_handler import setup_db_logging
 from bot.parsers.registry import ParserRegistry
@@ -74,6 +82,7 @@ VS_GAME_CHOICES = [
 
 PERIOD_CHOICES = [
     app_commands.Choice(name="All Time", value="alltime"),
+    app_commands.Choice(name="Season", value="season"),
     app_commands.Choice(name="Daily", value="daily"),
     app_commands.Choice(name="Weekly", value="weekly"),
     app_commands.Choice(name="Monthly", value="monthly"),
@@ -84,6 +93,7 @@ PERIOD_LABELS = {
     "weekly": "Weekly",
     "monthly": "Monthly",
     "alltime": "All Time",
+    "season": "Season",
 }
 
 
@@ -139,8 +149,13 @@ class ScoreBot(discord.Client):
                         for uid, _, streak in get_all_streaks(session, game_id)
                     }
 
+                if period_value == "season":
+                    current_season = get_current_season(session)
+                    period_label = current_season.name if current_season else "Season"
+                else:
+                    period_label = PERIOD_LABELS[period_value]
+
             game_label = game.name if game else "All Games"
-            period_label = PERIOD_LABELS[period_value]
             title = f"Leaderboard — {game_label} ({period_label})"
 
             embed = discord.Embed(title=title, color=discord.Color.gold())
@@ -373,6 +388,115 @@ class ScoreBot(discord.Client):
             ]
 
         @self.tree.command(
+            name="mystats",
+            description="View your personal stats, streaks, and achievements",
+        )
+        async def mystats(interaction: discord.Interaction) -> None:
+            user_id = str(interaction.user.id)
+            await interaction.response.defer(ephemeral=True)
+
+            with self.Session() as session:
+                all_rows = get_leaderboard(session, period="alltime")
+                user_row = next((r for r in all_rows if r.user_id == user_id), None)
+                total_pts = user_row.total_score if user_row else 0.0
+                overall_rank = user_row.rank if user_row else None
+                total_subs = user_row.submission_count if user_row else 0
+
+                season = get_current_season(session)
+                season_row = None
+                if season:
+                    season_rows = get_leaderboard(session, period="season")
+                    season_row = next(
+                        (r for r in season_rows if r.user_id == user_id), None
+                    )
+
+                enabled_games = (
+                    session.execute(select(Game).where(Game.enabled.is_(True)))
+                    .scalars()
+                    .all()
+                )
+
+                game_stats = []
+                for g in enabled_games:
+                    bests = get_personal_bests(session, user_id, g.id)
+                    if not bests:
+                        continue
+                    streak_row = get_user_streak(session, user_id, g.id)
+                    game_stats.append((g, bests, streak_row))
+
+                user_achievements = get_user_achievements(session, user_id)
+
+            embed = discord.Embed(
+                title=f"{interaction.user.display_name}'s Stats",
+                color=discord.Color.gold(),
+            )
+
+            rank_str = f"#{overall_rank}" if overall_rank else "Unranked"
+            embed.add_field(
+                name="Overall",
+                value=f"{rank_str} · {total_pts:.0f} pts · {total_subs} submissions",
+                inline=False,
+            )
+
+            if season:
+                s_rank = f"#{season_row.rank}" if season_row else "Unranked"
+                s_pts = season_row.total_score if season_row else 0.0
+                s_subs = season_row.submission_count if season_row else 0
+                embed.add_field(
+                    name=f"Season ({season.name})",
+                    value=f"{s_rank} · {s_pts:.0f} pts · {s_subs} submissions",
+                    inline=False,
+                )
+
+            for g, bests, streak_data in game_stats:
+                cur = streak_data.current_streak if streak_data else 0
+                best_streak = streak_data.longest_streak if streak_data else 0
+                freezes = streak_data.freeze_count if streak_data else 0
+
+                if cur >= 1:
+                    streak_str = f"🔥 {cur} day streak"
+                    if best_streak > cur:
+                        streak_str += f" (best: {best_streak})"
+                else:
+                    streak_str = "No active streak"
+                freeze_str = (
+                    f" · 🧊 {freezes} freeze{'s' if freezes != 1 else ''}"
+                    if freezes > 0
+                    else ""
+                )
+
+                embed.add_field(
+                    name=g.name,
+                    value=(
+                        f"{bests.count} subs · Best: {bests.best_score:.0f} · "
+                        f"Avg: {bests.avg_score:.1f}\n"
+                        f"{streak_str}{freeze_str}"
+                    ),
+                    inline=True,
+                )
+
+            if user_achievements:
+                parts = []
+                for ua in user_achievements:
+                    ach = ACHIEVEMENTS.get(ua.achievement_slug)
+                    if ach:
+                        parts.append(f"{ach.icon} {ach.name}")
+                embed.add_field(
+                    name=f"Achievements ({len(parts)})",
+                    value=" · ".join(parts) if parts else "—",
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name="Achievements",
+                    value="None yet — keep playing!",
+                    inline=False,
+                )
+
+            log.info("/mystats by %s", interaction.user.display_name)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+        @self.tree.command(
             name="remind",
             description="Toggle streak reminders for yourself",
         )
@@ -442,6 +566,7 @@ class ScoreBot(discord.Client):
             embed.add_field(
                 name="Commands",
                 value=(
+                    "`/mystats` — your personal stats, streaks, and achievements\n"
                     "`/leaderboard` — rankings by game and time period\n"
                     "`/best` — personal bests and stats for a game\n"
                     "`/vs` — head-to-head comparison against another player\n"
@@ -468,6 +593,15 @@ class ScoreBot(discord.Client):
             self._scheduler.add_job(
                 self._send_daily_digest,
                 CronTrigger(hour=_digest_hour, minute=_digest_minute),
+                replace_existing=True,
+            )
+            self._scheduler.add_job(
+                self._send_weekly_digest,
+                CronTrigger(
+                    day_of_week="mon",
+                    hour=_digest_hour,
+                    minute=_digest_minute,
+                ),
                 replace_existing=True,
             )
             self._scheduler.add_job(
@@ -656,6 +790,101 @@ class ScoreBot(discord.Client):
         await channel.send(embed=embed)
         log.info("Daily digest sent for %s", yesterday)
 
+    async def _send_weekly_digest(self) -> None:
+        channel = self.get_channel(DISCORD_CHANNEL_ID)
+        if channel is None:
+            log.warning("Weekly digest: channel %s not found", DISCORD_CHANNEL_ID)
+            return
+
+        with self.Session() as session:
+            data = get_weekly_digest(session)
+
+            # Check if a season ended yesterday and award season_champion if so
+            ended_season = get_season_ending_yesterday(session)
+            season_champion_user_id: str | None = None
+            if ended_season:
+                from bot.database import Submission, User
+
+                champion_row = session.execute(
+                    select(
+                        Submission.user_id,
+                        User.username,
+                        func.sum(Submission.total_score).label("pts"),
+                    )
+                    .join(User, Submission.user_id == User.user_id)
+                    .where(
+                        Submission.date >= ended_season.start_date,
+                        Submission.date <= ended_season.end_date,
+                    )
+                    .group_by(Submission.user_id)
+                    .order_by(func.sum(Submission.total_score).desc())
+                    .limit(1)
+                ).first()
+
+                if champion_row:
+                    newly_awarded = award_season_champion(session, champion_row.user_id)
+                    session.commit()
+                    if newly_awarded:
+                        season_champion_user_id = champion_row.user_id
+                        log.info(
+                            "Season Champion awarded to %s for season %s",
+                            champion_row.username,
+                            ended_season.name,
+                        )
+
+        if data.total_submissions == 0:
+            return
+
+        embed = discord.Embed(
+            title=f"Weekly Recap — {data.week_start} to {data.week_end}",
+            color=discord.Color.green(),
+        )
+        embed.add_field(
+            name="Total Activity",
+            value=f"{data.total_submissions} submissions · {data.unique_players} players",
+            inline=False,
+        )
+        if data.top_scorer_username:
+            embed.add_field(
+                name="🏆 Top Scorer",
+                value=f"**{data.top_scorer_username}** — {data.top_scorer_points:.0f} pts",
+                inline=True,
+            )
+        if data.most_active_username:
+            embed.add_field(
+                name="📊 Most Active",
+                value=f"**{data.most_active_username}** — {data.most_active_submissions} submissions",
+                inline=True,
+            )
+        if data.best_single_username:
+            embed.add_field(
+                name="⚡ Best Single Score",
+                value=(
+                    f"**{data.best_single_username}** — {data.best_single_score:.0f} pts"
+                    + (f" ({data.best_single_game})" if data.best_single_game else "")
+                ),
+                inline=True,
+            )
+        if data.top_streak_username and data.top_streak_days >= 1:
+            embed.add_field(
+                name="🔥 Longest Streak",
+                value=f"**{data.top_streak_username}** — {data.top_streak_days} days",
+                inline=True,
+            )
+
+        await channel.send(embed=embed)
+        log.info("Weekly digest sent for week ending %s", data.week_end)
+
+        if season_champion_user_id:
+            try:
+                champ_user = await self.fetch_user(int(season_champion_user_id))
+                await champ_user.send(
+                    f"👑 You finished **#1** in the **{ended_season.name}** season! "
+                    "Achievement unlocked: **Season Champion**."
+                )
+            except Exception:
+                log.warning("Could not DM season champion %s", season_champion_user_id)
+
     async def _send_streak_reminders(self) -> None:
         today = datetime.datetime.now(datetime.timezone.utc).date()
 
@@ -731,17 +960,74 @@ class ScoreBot(discord.Client):
                 )
                 if not duplicate:
                     game_name = game.name
-                    record_submission(session, result, username)
+                    submission = record_submission(session, result, username)
+                    if submission is None:
+                        await message.add_reaction("⚠️")
+                        break
+
+                    user_streak, freeze_used = update_streak_on_submission(
+                        session, result.user_id, result.game_id, result.date
+                    )
+                    enabled_count = (
+                        session.scalar(
+                            select(func.count())
+                            .select_from(Game)
+                            .where(Game.enabled.is_(True))
+                        )
+                        or 0
+                    )
+                    new_achievements = check_and_award_achievements(
+                        session,
+                        result.user_id,
+                        result.game_id,
+                        result.date,
+                        user_streak,
+                        submission,
+                        freeze_used,
+                        enabled_count,
+                    )
                     session.commit()
-                    streak = get_streak(session, result.user_id, result.game_id)
+
+                    streak = user_streak.current_streak
                     log.info(
-                        "Recorded %s for %s: base=%s total=%s",
+                        "Recorded %s for %s: base=%s streak=%s",
                         result.game_id,
                         username,
                         result.base_score,
-                        result.base_score,
+                        streak,
                     )
                     await message.add_reaction(parser.reaction)
+
+                    if freeze_used:
+                        try:
+                            dm_user = await self.fetch_user(int(result.user_id))
+                            await dm_user.send(
+                                f"🧊 A streak freeze was used to preserve your "
+                                f"**{streak}-day streak** in **{game_name}**! "
+                                f"You have {user_streak.freeze_count} freeze"
+                                f"{'s' if user_streak.freeze_count != 1 else ''} remaining."
+                            )
+                        except Exception:
+                            log.warning(
+                                "Could not DM freeze notification to %s", result.user_id
+                            )
+
+                    for slug in new_achievements:
+                        ach = ACHIEVEMENTS.get(slug)
+                        if ach:
+                            try:
+                                dm_user = await self.fetch_user(int(result.user_id))
+                                await dm_user.send(
+                                    f"🏆 Achievement unlocked: **{ach.icon} {ach.name}**\n"
+                                    f"_{ach.description}_"
+                                )
+                            except Exception:
+                                log.warning(
+                                    "Could not DM achievement %s to %s",
+                                    slug,
+                                    result.user_id,
+                                )
+
                     if streak >= 3:
                         await message.channel.send(
                             f"🔥 {username} is on a **{streak}-day streak** in {game_name}!",
