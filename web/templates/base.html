@@ -228,6 +228,9 @@
     th.sortable { cursor: pointer; user-select: none; }
     th.sortable:hover { background: var(--th-hover); }
     .sort-icon { font-size: 9px; color: var(--text-subtle); margin-left: 3px; }
+    .badge-info { background: var(--badge-glyph-bg); color: var(--badge-glyph-text); }
+    .badge-warning { background: var(--c-warning-bg); color: var(--c-warning-text); }
+    .badge-error { background: var(--flash-err-bg); color: var(--flash-err-text); }
   </style>
 </head>
 <body>
@@ -241,6 +244,7 @@
       <a href="/admin/users" {% if active == 'users' %}class="active"{% endif %}>Users</a>
       <a href="/admin/stats" {% if active == 'stats' %}class="active"{% endif %}>Stats</a>
       <a href="/admin/tools" {% if active == 'tools' %}class="active"{% endif %}>Tools</a>
+      <a href="/admin/logs" {% if active == 'logs' %}class="active"{% endif %}>Logs</a>
     </nav>
     <div class="header-actions">
       <button class="theme-btn" id="darkToggle" title="Toggle dark mode">Dark</button>
