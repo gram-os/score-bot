@@ -19,7 +19,7 @@ class PokeDokuParser(GameParser):
 
     @property
     def reaction(self) -> str:
-        return "⛔️"
+        return "🔴"
 
     def can_parse(self, message: str) -> bool:
         return bool(_PATTERN.search(message))

@@ -1,13 +1,17 @@
 import logging
+import os
 from datetime import date as date_type
 from datetime import datetime as dt
 
+import httpx
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
 from bot.database import bulk_delete_submissions
 from bot.parsers.registry import all_parsers
+from web.backfill import process_messages
 from web.deps import _db_session, fetch_all_games, require_admin, templates
+from web.discord_api import fetch_channel_messages
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -34,6 +38,7 @@ async def tools_view(
             "tested": False,
             "message": "",
             "results": [],
+            "backfill_result": None,
         },
     )
 
@@ -73,6 +78,7 @@ async def tools_parse_test(
             "tested": True,
             "message": message,
             "results": results,
+            "backfill_result": None,
         },
     )
 
@@ -100,3 +106,91 @@ async def tools_bulk_delete(
     )
     request.session["flash"] = f"Deleted {count} submission(s) for {game_id} on {date}."
     return RedirectResponse(url="/admin/tools", status_code=303)
+
+
+@router.post("/tools/backfill")
+async def tools_backfill(
+    request: Request,
+    start_date: str = Form(...),
+    end_date: str = Form(...),
+    admin_session: dict = Depends(require_admin),
+):
+    token = os.environ.get("DISCORD_TOKEN", "")
+    channel_id = int(os.environ.get("DISCORD_CHANNEL_ID", "0"))
+
+    db = _db_session()
+    try:
+        games = fetch_all_games(db)
+    finally:
+        db.close()
+
+    start = date_type.fromisoformat(start_date)
+    end = date_type.fromisoformat(end_date)
+
+    if start > end:
+        return templates.TemplateResponse(
+            request,
+            "tools.html",
+            {
+                "active": "tools",
+                "games": games,
+                "flash": "Start date must be on or before end date.",
+                "tested": False,
+                "message": "",
+                "results": [],
+                "backfill_result": None,
+            },
+        )
+
+    try:
+        messages = await fetch_channel_messages(token, channel_id, start, end)
+    except httpx.HTTPStatusError as exc:
+        log.error("Discord API error during backfill: %s", exc)
+        return templates.TemplateResponse(
+            request,
+            "tools.html",
+            {
+                "active": "tools",
+                "games": games,
+                "flash": f"Discord API error: {exc.response.status_code} — check token and channel ID.",
+                "tested": False,
+                "message": "",
+                "results": [],
+                "backfill_result": None,
+            },
+        )
+
+    db = _db_session()
+    try:
+        backfill_result = process_messages(db, messages)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    log.info(
+        "Admin %s backfilled %s–%s: %d recorded, %d duplicates, %d errors",
+        admin_session["username"],
+        start_date,
+        end_date,
+        len(backfill_result.recorded),
+        len(backfill_result.duplicates),
+        len(backfill_result.errors),
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "tools.html",
+        {
+            "active": "tools",
+            "games": games,
+            "flash": None,
+            "tested": False,
+            "message": "",
+            "results": [],
+            "backfill_result": backfill_result,
+            "backfill_range": f"{start_date} → {end_date}",
+        },
+    )
