@@ -169,15 +169,11 @@ class ScoreBot(discord.Client):
             current: str,
         ) -> list[app_commands.Choice[str]]:
             choices = [app_commands.Choice(name="All Games", value="all")] + [
-                app_commands.Choice(name=p.game_name, value=p.game_id)
-                for p in self.registry.all_parsers()
+                app_commands.Choice(name=p.game_name, value=p.game_id) for p in self.registry.all_parsers()
             ]
             if current:
                 choices = [
-                    c
-                    for c in choices
-                    if current.lower() in c.name.lower()
-                    or current.lower() in c.value.lower()
+                    c for c in choices if current.lower() in c.name.lower() or current.lower() in c.value.lower()
                 ]
             return choices[:25]
 
@@ -318,9 +314,7 @@ class ScoreBot(discord.Client):
             return [
                 app_commands.Choice(name=p.game_name, value=p.game_id)
                 for p in self.registry.all_parsers()
-                if not current
-                or current.lower() in p.game_name.lower()
-                or current.lower() in p.game_id.lower()
+                if not current or current.lower() in p.game_name.lower() or current.lower() in p.game_id.lower()
             ][:25]
 
         @self.tree.command(name="best", description="Show personal bests for a game")
