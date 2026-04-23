@@ -62,22 +62,6 @@ _digest_hour, _digest_minute = (int(x) for x in _DIGEST_TIME.split(":"))
 _REMINDER_TIME = os.environ.get("REMINDER_TIME", "20:00")
 _reminder_hour, _reminder_minute = (int(x) for x in _REMINDER_TIME.split(":"))
 
-GAME_CHOICES = [
-    app_commands.Choice(name="All", value="all"),
-    app_commands.Choice(name="Wordle", value="wordle"),
-    app_commands.Choice(name="Glyph", value="glyph"),
-    app_commands.Choice(name="Enclose Horse", value="enclose_horse"),
-    app_commands.Choice(name="Mini Crossword", value="mini_crossword"),
-    app_commands.Choice(name="Quordle", value="quordle"),
-    app_commands.Choice(name="Connections", value="connections"),
-]
-
-VS_GAME_CHOICES = [
-    app_commands.Choice(name="Wordle", value="wordle"),
-    app_commands.Choice(name="Glyph", value="glyph"),
-    app_commands.Choice(name="Enclose Horse", value="enclose_horse"),
-]
-
 PERIOD_CHOICES = [
     app_commands.Choice(name="All Time", value="alltime"),
     app_commands.Choice(name="Season", value="season"),
@@ -117,13 +101,13 @@ class ScoreBot(discord.Client):
             game="Which game to show (default: all)",
             period="Time period (default: alltime)",
         )
-        @app_commands.choices(game=GAME_CHOICES, period=PERIOD_CHOICES)
+        @app_commands.choices(period=PERIOD_CHOICES)
         async def leaderboard(
             interaction: discord.Interaction,
-            game: app_commands.Choice[str] = None,
+            game: str = None,
             period: app_commands.Choice[str] = None,
         ) -> None:
-            game_id = game.value if game else "all"
+            game_id = game if game else "all"
             period_value = period.value if period else "alltime"
 
             with self.Session() as session:
@@ -148,7 +132,11 @@ class ScoreBot(discord.Client):
                 else:
                     period_label = PERIOD_LABELS[period_value]
 
-            game_label = game.name if game else "All Games"
+            if game_id == "all":
+                game_label = "All Games"
+            else:
+                parser = self.registry.get_parser(game_id)
+                game_label = parser.game_name if parser else game_id
             title = f"Leaderboard — {game_label} ({period_label})"
 
             embed = discord.Embed(title=title, color=discord.Color.gold())
@@ -174,6 +162,24 @@ class ScoreBot(discord.Client):
                 period_value,
             )
             await interaction.response.send_message(embed=embed)
+
+        @leaderboard.autocomplete("game")
+        async def leaderboard_game_autocomplete(
+            interaction: discord.Interaction,
+            current: str,
+        ) -> list[app_commands.Choice[str]]:
+            choices = [app_commands.Choice(name="All Games", value="all")] + [
+                app_commands.Choice(name=p.game_name, value=p.game_id)
+                for p in self.registry.all_parsers()
+            ]
+            if current:
+                choices = [
+                    c
+                    for c in choices
+                    if current.lower() in c.name.lower()
+                    or current.lower() in c.value.lower()
+                ]
+            return choices[:25]
 
         @self.tree.command(name="games", description="List enabled games")
         async def games(interaction: discord.Interaction) -> None:
@@ -241,11 +247,10 @@ class ScoreBot(discord.Client):
             opponent="The player to compare against",
             game="Which game to compare (default: all games)",
         )
-        @app_commands.choices(game=VS_GAME_CHOICES)
         async def vs(
             interaction: discord.Interaction,
             opponent: discord.Member,
-            game: app_commands.Choice[str] = None,
+            game: str = None,
         ) -> None:
             caller_id = str(interaction.user.id)
             opponent_id = str(opponent.id)
@@ -254,8 +259,12 @@ class ScoreBot(discord.Client):
                 await interaction.response.send_message("You can't challenge yourself!", ephemeral=True)
                 return
 
-            game_id = game.value if game else None
-            game_label = game.name if game else "All Games"
+            game_id = game if game else None
+            if game_id:
+                parser = self.registry.get_parser(game_id)
+                game_label = parser.game_name if parser else game_id
+            else:
+                game_label = "All Games"
 
             with self.Session() as session:
                 result = get_head_to_head(session, caller_id, opponent_id, game_id)
@@ -300,6 +309,19 @@ class ScoreBot(discord.Client):
             embed.set_footer(text=f"Based on {overlapping} overlapping day(s)")
 
             await interaction.response.send_message(embed=embed)
+
+        @vs.autocomplete("game")
+        async def vs_game_autocomplete(
+            interaction: discord.Interaction,
+            current: str,
+        ) -> list[app_commands.Choice[str]]:
+            return [
+                app_commands.Choice(name=p.game_name, value=p.game_id)
+                for p in self.registry.all_parsers()
+                if not current
+                or current.lower() in p.game_name.lower()
+                or current.lower() in p.game_id.lower()
+            ][:25]
 
         @self.tree.command(name="best", description="Show personal bests for a game")
         @app_commands.describe(
