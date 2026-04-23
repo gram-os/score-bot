@@ -536,7 +536,7 @@ class ScoreBot(discord.Client):
                 ach_value = "None yet — keep playing!"
 
             embed.add_field(
-                name=f"─── 🏆 Achievements ({earned_count} / {total_achievements}) ───",
+                name=f"🏆 Achievements ({earned_count} / {total_achievements})",
                 value=ach_value,
                 inline=False,
             )
