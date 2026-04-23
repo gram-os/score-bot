@@ -65,3 +65,7 @@ Each game has a parser in `bot/parsers/` that extends `GameParser` (ABC in `base
 ### Auth
 
 Admin access is controlled purely by `ADMIN_DISCORD_IDS` env var (comma-separated Discord user IDs). There is no role table. Session cookie is signed with `SECRET_KEY`.
+
+## Git Environment Notes
+- This repo may not have `origin/HEAD` set. When diffing against the default branch, use `origin/main` explicitly rather than `origin/HEAD`.
+- If a slash command fails at a git step, surface the error to the user immediately rather than silently exiting.
