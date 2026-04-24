@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from sqlalchemy import select
 
-from bot.database import Game, add_suggestion, find_similar_name, get_unpolled_suggestions
+from bot.database import Game, add_suggestion, find_similar_name, get_unpolled_suggestions, log_usage_event
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +48,13 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
                 username=interaction.user.display_name,
                 game_name=game_name,
                 description=description,
+            )
+            log_usage_event(
+                session,
+                "command.suggest",
+                str(interaction.user.id),
+                interaction.user.display_name,
+                {"game_name": game_name},
             )
             session.commit()
             log.info("/suggest by %s: %s", interaction.user.display_name, game_name)

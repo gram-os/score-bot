@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 
 from bot.achievements import ACHIEVEMENTS
-from bot.database import get_current_season, get_user_achievements, get_user_best_streaks
+from bot.database import get_current_season, get_user_achievements, get_user_best_streaks, log_usage_event
 from bot.helpers import UserOverview, format_badges, get_user_overview
 
 log = logging.getLogger(__name__)
@@ -26,6 +26,14 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             season_label = season.name if season else None
             best_current, best_ever = get_user_best_streaks(session, target_id)
             user_achievements = get_user_achievements(session, target_id)
+            log_usage_event(
+                session,
+                "command.profile",
+                str(interaction.user.id),
+                interaction.user.display_name,
+                {"target": target.display_name},
+            )
+            session.commit()
 
         earned_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
         total_achievements = len(ACHIEVEMENTS)

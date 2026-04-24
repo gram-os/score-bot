@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Usage — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Usage Events</h2>
+
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+  {% for event_type, count in summary %}
+  <div class="stat-card">
+    <div class="stat-label">{{ event_type }}</div>
+    <div class="stat-value">{{ count }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="filters">
+  <form method="get" action="/admin/usage" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;width:100%">
+    <div class="filter-group">
+      <label>Event Type</label>
+      <input type="text" name="event_type" value="{{ filter_event_type }}" class="input" placeholder="e.g. command.leaderboard" style="width:220px">
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="/admin/usage" class="btn btn-secondary">Clear</a>
+  </form>
+</div>
+
+<div style="margin-bottom:12px;color:var(--text-muted);font-size:13px;">
+  {{ total }} event{{ 's' if total != 1 else '' }}
+</div>
+
+{% if events %}
+<table>
+  <thead>
+    <tr>
+      <th>Timestamp</th>
+      <th>Event</th>
+      <th>User</th>
+      <th>Metadata</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td style="white-space:nowrap;color:var(--text-muted);font-size:12px;font-family:monospace">{{ event.timestamp_str }}</td>
+      <td>
+        {% if event.event_type.startswith('feature.') %}
+          <span class="badge badge-warning">{{ event.event_type }}</span>
+        {% else %}
+          <span class="badge badge-info">{{ event.event_type }}</span>
+        {% endif %}
+      </td>
+      <td style="font-size:13px">{{ event.username }}</td>
+      <td style="font-family:monospace;font-size:12px;color:var(--text-muted)">{{ event.metadata }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="{{ page_url(page - 1) }}">← Prev</a>
+  {% endif %}
+  <span class="current">{{ page }}</span>
+  {% if has_next %}
+  <a href="{{ page_url(page + 1) }}">Next →</a>
+  {% endif %}
+</div>
+{% else %}
+<div class="empty">No usage events found.</div>
+{% endif %}
+{% endblock %}

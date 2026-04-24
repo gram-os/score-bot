@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 
-from bot.database import get_personal_bests, get_streak
+from bot.database import get_personal_bests, get_streak, log_usage_event
 from bot.helpers import game_autocomplete_choices, resolve_game_label
 
 
@@ -23,6 +23,14 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
         with Session() as session:
             bests = get_personal_bests(session, target_id, game)
             streak = get_streak(session, target_id, game) if bests else 0
+            log_usage_event(
+                session,
+                "command.best",
+                str(interaction.user.id),
+                interaction.user.display_name,
+                {"game": game, "target": target.display_name},
+            )
+            session.commit()
 
         if bests is None:
             await interaction.response.send_message(

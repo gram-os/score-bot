@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from bot.db.models import Submission
@@ -38,4 +38,13 @@ def get_personal_bests(session: Session, user_id: str, game_id: str) -> "Persona
         best_raw_data=best.raw_data,
         avg_score=avg,
         count=len(rows),
+    )
+
+
+def get_best_base_score(session: Session, user_id: str, game_id: str) -> float | None:
+    return session.scalar(
+        select(func.max(Submission.base_score)).where(
+            Submission.user_id == user_id,
+            Submission.game_id == game_id,
+        )
     )
