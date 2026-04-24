@@ -20,8 +20,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Score Bot Admin", lifespan=lifespan)
 
-secret_key = os.environ.get("SECRET_KEY", "changeme")
-app.add_middleware(SessionMiddleware, secret_key=secret_key)
+_secret_key = os.environ.get("SECRET_KEY", "")
+if not _secret_key or _secret_key == "changeme":
+    raise RuntimeError("SECRET_KEY must be set to a strong random value (run: openssl rand -hex 32)")
+
+_https_only = os.environ.get("SESSION_HTTPS_ONLY", "true").lower() == "true"
+app.add_middleware(SessionMiddleware, secret_key=_secret_key, https_only=_https_only, same_site="strict")
 
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 

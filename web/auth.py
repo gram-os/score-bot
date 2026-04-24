@@ -36,13 +36,20 @@ async def login(request: Request):
 
 @router.get("/callback", name="callback")
 async def callback(request: Request):
-    token = await oauth.discord.authorize_access_token(request)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://discord.com/api/users/@me",
-            headers={"Authorization": f"Bearer {token['access_token']}"},
+    try:
+        token = await oauth.discord.authorize_access_token(request)
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://discord.com/api/users/@me",
+                headers={"Authorization": f"Bearer {token['access_token']}"},
+            )
+        resp.raise_for_status()
+    except Exception:
+        log.exception("OAuth callback failed")
+        return HTMLResponse(
+            content="<h1>Login failed</h1><p>Could not complete Discord authentication.</p>",
+            status_code=400,
         )
-    resp.raise_for_status()
     user = resp.json()
 
     user_id = user["id"]
@@ -51,7 +58,7 @@ async def callback(request: Request):
     if user_id not in _admin_ids():
         log.warning("Unauthorized login attempt by %s (id=%s)", username, user_id)
         return HTMLResponse(
-            content=f"<h1>403 Forbidden</h1><p>Discord ID {user_id} is not authorized.</p>",
+            content="<h1>403 Forbidden</h1><p>Your account is not authorized to access this panel.</p>",
             status_code=403,
         )
 
