@@ -1,3 +1,8 @@
+from bot.db.achievements import award_season_champion, get_user_achievements
+from bot.db.config import get_config, set_config
+from bot.db.head_to_head import HeadToHeadResult, get_head_to_head
+from bot.db.leaderboard import LeaderboardRow, get_leaderboard
+from bot.db.logs import get_logs
 from bot.db.models import (
     AdminConfig,
     AppLog,
@@ -11,20 +16,12 @@ from bot.db.models import (
     UserAchievement,
     UserPreference,
     UserStreak,
+    UsageEvent,
     get_engine,
 )
-from bot.db.submissions import (
-    UserSummary,
-    add_submission_manual,
-    bulk_delete_submissions,
-    delete_submission,
-    get_users_summary,
-    is_duplicate,
-    recalculate_game_ranks,
-    record_submission,
-    upsert_user,
-)
-from bot.db.leaderboard import LeaderboardRow, get_leaderboard
+from bot.db.personal_bests import PersonalBests, get_best_base_score, get_personal_bests
+from bot.db.preferences import get_opted_in_preferences, get_preference, set_preference
+from bot.db.seasons import get_current_season, get_season_ending_yesterday
 from bot.db.streaks import (
     GameDigestData,
     MAX_FREEZES,
@@ -37,10 +34,17 @@ from bot.db.streaks import (
     get_yesterday_digest,
     update_streak_on_submission,
 )
-from bot.db.seasons import get_current_season, get_season_ending_yesterday
-from bot.db.achievements import award_season_champion, get_user_achievements
-from bot.db.personal_bests import PersonalBests, get_personal_bests
-from bot.db.head_to_head import HeadToHeadResult, get_head_to_head
+from bot.db.submissions import (
+    UserSummary,
+    add_submission_manual,
+    bulk_delete_submissions,
+    delete_submission,
+    get_users_summary,
+    is_duplicate,
+    recalculate_game_ranks,
+    record_submission,
+    upsert_user,
+)
 from bot.db.suggestions import (
     add_suggestion,
     create_daily_poll,
@@ -49,9 +53,7 @@ from bot.db.suggestions import (
     get_unpolled_suggestions,
     mark_poll_notified,
 )
-from bot.db.preferences import get_opted_in_preferences, get_preference, set_preference
-from bot.db.logs import get_logs
-from bot.db.config import get_config, set_config
+from bot.db.usage import get_usage_events, get_usage_summary, log_usage_event
 
 __all__ = [
     "AdminConfig",
@@ -66,6 +68,7 @@ __all__ = [
     "UserAchievement",
     "UserPreference",
     "UserStreak",
+    "UsageEvent",
     "get_engine",
     "UserSummary",
     "add_submission_manual",
@@ -93,6 +96,7 @@ __all__ = [
     "award_season_champion",
     "get_user_achievements",
     "PersonalBests",
+    "get_best_base_score",
     "get_personal_bests",
     "HeadToHeadResult",
     "get_head_to_head",
@@ -108,4 +112,7 @@ __all__ = [
     "get_logs",
     "get_config",
     "set_config",
+    "get_usage_events",
+    "get_usage_summary",
+    "log_usage_event",
 ]

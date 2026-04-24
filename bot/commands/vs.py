@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 
-from bot.database import get_head_to_head
+from bot.database import get_head_to_head, log_usage_event
 from bot.helpers import game_autocomplete_choices, resolve_game_label
 
 
@@ -27,6 +27,14 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
 
         with Session() as session:
             result = get_head_to_head(session, caller_id, opponent_id, game)
+            log_usage_event(
+                session,
+                "command.vs",
+                caller_id,
+                interaction.user.display_name,
+                {"opponent": opponent.display_name, "game": game or "all"},
+            )
+            session.commit()
 
         if result is None:
             await interaction.response.send_message(

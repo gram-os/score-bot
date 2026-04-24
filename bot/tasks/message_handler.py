@@ -5,7 +5,15 @@ import discord
 from sqlalchemy import func, select
 
 from bot.achievements import ACHIEVEMENTS, check_and_award_achievements
-from bot.database import Game, is_duplicate, record_submission, update_streak_on_submission
+from bot.database import (
+    Game,
+    get_best_base_score,
+    get_leaderboard,
+    is_duplicate,
+    log_usage_event,
+    record_submission,
+    update_streak_on_submission,
+)
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +58,11 @@ async def handle_message(
             duplicate = is_duplicate(session, result.user_id, result.game_id, result.date)
             if not duplicate:
                 game_name = game.name
+
+                pre_daily = get_leaderboard(session, "daily")
+                pre_top_user = pre_daily[0].user_id if pre_daily else None
+                previous_best_base = get_best_base_score(session, result.user_id, result.game_id)
+
                 submission = record_submission(session, result, username)
                 if submission is None:
                     await message.add_reaction("⚠️")
@@ -71,7 +84,40 @@ async def handle_message(
                     freeze_used,
                     enabled_count,
                 )
+                log_usage_event(
+                    session,
+                    "feature.submission",
+                    result.user_id,
+                    username,
+                    {"game_id": result.game_id, "base_score": result.base_score},
+                )
                 session.commit()
+
+                post_daily = get_leaderboard(session, "daily")
+                post_top_user = post_daily[0].user_id if post_daily else None
+                is_comeback = (
+                    post_top_user == result.user_id and pre_top_user is not None and pre_top_user != result.user_id
+                )
+                is_pb = previous_best_base is not None and result.base_score > previous_best_base
+
+                if is_pb or is_comeback:
+                    if is_pb:
+                        log_usage_event(
+                            session,
+                            "feature.personal_best",
+                            result.user_id,
+                            username,
+                            {"game_id": result.game_id, "base_score": result.base_score},
+                        )
+                    if is_comeback:
+                        log_usage_event(
+                            session,
+                            "feature.comeback",
+                            result.user_id,
+                            username,
+                            {"game_id": result.game_id},
+                        )
+                    session.commit()
 
                 streak = user_streak.current_streak
                 log.info(
@@ -101,6 +147,19 @@ async def handle_message(
                             result.user_id,
                             f"🏆 Achievement unlocked: **{ach.icon} {ach.name}**\n_{ach.description}_",
                         )
+
+                if is_pb:
+                    await message.channel.send(
+                        f"🏆 New personal best! **{username}** scored **{result.base_score:.0f}** in {game_name}!",
+                        reference=message,
+                    )
+
+                if is_comeback:
+                    await message.add_reaction("👑")
+                    await message.channel.send(
+                        f"👑 **{username}** reclaims the top spot on today's leaderboard!",
+                        reference=message,
+                    )
 
                 if streak >= 3:
                     await message.channel.send(

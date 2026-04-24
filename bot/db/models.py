@@ -140,6 +140,17 @@ class AdminConfig(Base):
     value: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class UsageEvent(Base):
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    username: Mapped[str | None] = mapped_column(String, nullable=True)
+    event_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 def get_engine(db_path: str | None = None):
     path = db_path or os.environ.get("DATABASE_PATH", "/data/scores.db")
     return create_engine(f"sqlite:///{path}")

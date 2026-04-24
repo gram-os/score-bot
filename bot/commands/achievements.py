@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 
 from bot.achievements import ACHIEVEMENTS
-from bot.database import get_user_achievements
+from bot.database import get_user_achievements, log_usage_event
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +21,14 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
 
         with Session() as session:
             user_achievements = get_user_achievements(session, target_id)
+            log_usage_event(
+                session,
+                "command.achievements",
+                str(interaction.user.id),
+                interaction.user.display_name,
+                {"target": target.display_name},
+            )
+            session.commit()
 
         earned_slugs = {ua.achievement_slug for ua in user_achievements}
         total = len(ACHIEVEMENTS)

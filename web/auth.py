@@ -9,7 +9,7 @@ from starlette.config import Config
 
 from web.deps import _admin_ids, require_admin
 from web.routes import config as config_routes
-from web.routes import games, leaderboard, live, logs, stats, submissions, tools, users
+from web.routes import games, leaderboard, live, logs, stats, submissions, tools, usage, users
 
 log = logging.getLogger(__name__)
 
@@ -83,3 +83,4 @@ admin_router.include_router(users.router)
 admin_router.include_router(logs.router)
 admin_router.include_router(config_routes.router)
 admin_router.include_router(leaderboard.router)
+admin_router.include_router(usage.router)

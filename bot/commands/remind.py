@@ -3,7 +3,7 @@ import logging
 import discord
 from discord import app_commands
 
-from bot.database import get_preference, set_preference
+from bot.database import get_preference, log_usage_event, set_preference
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +19,9 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
 
             if threshold == 0 or currently_opted_in:
                 set_preference(session, user_id, remind_streak_days=0)
+                log_usage_event(
+                    session, "command.remind", user_id, interaction.user.display_name, {"action": "opt_out"}
+                )
                 session.commit()
                 log.info("/remind: %s opted out of streak reminders", interaction.user.display_name)
                 await interaction.response.send_message(
@@ -27,6 +30,13 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
                 )
             else:
                 set_preference(session, user_id, remind_streak_days=threshold)
+                log_usage_event(
+                    session,
+                    "command.remind",
+                    user_id,
+                    interaction.user.display_name,
+                    {"action": "opt_in", "threshold": threshold},
+                )
                 session.commit()
                 log.info(
                     "/remind: %s opted in (threshold=%d)",

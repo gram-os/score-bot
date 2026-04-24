@@ -12,6 +12,7 @@ from bot.database import (
     get_personal_bests,
     get_user_achievements,
     get_user_streak,
+    log_usage_event,
 )
 from bot.helpers import UserOverview, format_badges, get_user_overview
 
@@ -44,6 +45,8 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
                 game_stats.append((g, bests, streak_row))
 
             user_achievements = get_user_achievements(session, user_id)
+            log_usage_event(session, "command.mystats", user_id, interaction.user.display_name)
+            session.commit()
 
         embed = discord.Embed(
             title=f"{interaction.user.display_name}'s Stats",
