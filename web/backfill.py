@@ -16,6 +16,8 @@ class BackfillRow:
     date: date
     base_score: float
     status: str
+    message_id: str = ""
+    reaction: str = ""
 
 
 @dataclass
@@ -103,6 +105,8 @@ def process_messages(session: Session, messages: list[dict]) -> BackfillResult:
                     date=parse_result.date,
                     base_score=parse_result.base_score,
                     status="recorded",
+                    message_id=msg["id"],
+                    reaction=parser.reaction,
                 )
             )
             break
