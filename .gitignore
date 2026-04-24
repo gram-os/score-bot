@@ -29,3 +29,8 @@ env/
 # IDE
 .vscode/
 .idea/
+
+# Cloudflare Tunnel
+.cloudflared/
+*.json
+!package.json
