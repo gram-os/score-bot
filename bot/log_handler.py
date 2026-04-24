@@ -29,12 +29,14 @@ class DBLogHandler(logging.Handler):
         try:
             from bot.database import AppLog
 
+            exc_text = self.formatException(record.exc_info) if record.exc_info else None
             with self._Session() as session:
                 entry = AppLog(
                     timestamp=datetime.utcfromtimestamp(record.created),
                     level=record.levelname,
                     logger=record.name,
                     message=record.getMessage(),
+                    exc_text=exc_text,
                 )
                 session.add(entry)
                 session.commit()

@@ -47,6 +47,7 @@ def convert_log_timestamps(rows: list, tz: ZoneInfo) -> list[dict]:
                 "level": entry.level,
                 "logger": entry.logger,
                 "message": entry.message,
+                "exc_text": entry.exc_text,
             }
         )
     return result

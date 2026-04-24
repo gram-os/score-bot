@@ -102,6 +102,39 @@ class ScoreBot(discord.Client):
     async def _send_streak_reminders(self) -> None:
         await reminders.send_streak_reminders(self, self.Session, DISCORD_CHANNEL_ID)
 
+    async def on_app_command_error(
+        self,
+        interaction: discord.Interaction,
+        error: app_commands.AppCommandError,
+    ) -> None:
+        command_name = interaction.command and interaction.command.name
+        log.exception("Error in command '%s'", command_name, exc_info=error)
+        await self._notify_admins_of_error(command_name, interaction.user, error)
+        msg = "Something went wrong. Please try again."
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+
+    async def _notify_admins_of_error(
+        self,
+        command_name: str | None,
+        triggering_user: discord.User | discord.Member,
+        error: Exception,
+    ) -> None:
+        cause = error.__cause__ or error
+        dm = (
+            f"**Bot error** in `/{command_name or '?'}`\n"
+            f"Triggered by: {triggering_user} (`{triggering_user.id}`)\n"
+            f"```{type(cause).__name__}: {cause}```"
+        )
+        for admin_id in ADMIN_DISCORD_IDS:
+            try:
+                user = await self.fetch_user(admin_id)
+                await user.send(dm)
+            except Exception:
+                log.warning("Failed to DM admin %s", admin_id)
+
     async def on_message(self, message: discord.Message) -> None:
         await message_handler.handle_message(self, message, self.registry, self.Session, DISCORD_CHANNEL_ID)
 
