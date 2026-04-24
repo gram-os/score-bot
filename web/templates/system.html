@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}System — Score Bot Admin{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+  <h2>System</h2>
+  <span id="lastUpdated" style="font-size:12px;color:var(--text-subtle);">Loading…</span>
+</div>
+
+<div id="statsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+  <div class="card" style="padding:16px;">
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;font-weight:600;">CPU % (last 60s)</div>
+    <canvas id="cpuChart" height="120"></canvas>
+  </div>
+  <div class="card" style="padding:16px;">
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;font-weight:600;">Memory % (last 60s)</div>
+    <canvas id="memChart" height="120"></canvas>
+  </div>
+</div>
+
+<style>
+  .hw-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px; }
+  .hw-label { font-size: 11px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .hw-value { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+  .hw-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+  .progress-track { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .bar-ok   { background: var(--c-success); }
+  .bar-warn { background: #f39c12; }
+  .bar-danger { background: var(--c-danger); }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const MAX_POINTS = 12;
+  const POLL_MS = 5000;
+
+  const cpuHistory  = Array(MAX_POINTS).fill(null);
+  const memHistory  = Array(MAX_POINTS).fill(null);
+  const labels      = Array(MAX_POINTS).fill('');
+
+  function barClass(pct) {
+    if (pct >= 90) return 'bar-danger';
+    if (pct >= 70) return 'bar-warn';
+    return 'bar-ok';
+  }
+
+  function makeCard(label, valueText, subText, percent) {
+    const card = document.createElement('div');
+    card.className = 'hw-card';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'hw-label';
+    lbl.textContent = label;
+
+    const val = document.createElement('div');
+    val.className = 'hw-value';
+    val.textContent = valueText;
+
+    const sub = document.createElement('div');
+    sub.className = 'hw-sub';
+    sub.textContent = subText;
+
+    card.append(lbl, val, sub);
+
+    if (percent !== null) {
+      const track = document.createElement('div');
+      track.className = 'progress-track';
+      const bar = document.createElement('div');
+      bar.className = 'progress-bar ' + barClass(percent);
+      bar.style.width = Math.min(percent, 100) + '%';
+      track.appendChild(bar);
+      card.appendChild(track);
+    }
+
+    return card;
+  }
+
+  function renderCards(d) {
+    const tempCard = d.cpu_temp !== null
+      ? makeCard('CPU Temp', d.cpu_temp.toFixed(1) + '°C', 'Raspberry Pi', null)
+      : makeCard('CPU Temp', '—', 'Sensor unavailable', null);
+
+    document.getElementById('statsGrid').replaceChildren(
+      makeCard('CPU', d.cpu_percent + '%', 'Utilization', d.cpu_percent),
+      makeCard('Memory', d.mem_percent + '%', d.mem_used_mb + ' MB / ' + d.mem_total_mb + ' MB', d.mem_percent),
+      makeCard('Disk', d.disk_percent + '%', d.disk_used_gb + ' GB / ' + d.disk_total_gb + ' GB', d.disk_percent),
+      tempCard,
+      makeCard('Uptime', d.uptime, 'Since last boot', null),
+    );
+  }
+
+  function getChartStyle() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      text:   s.getPropertyValue('--text').trim()        || '#222',
+      subtle: s.getPropertyValue('--text-subtle').trim() || '#999',
+      border: s.getPropertyValue('--border').trim()      || '#ddd',
+    };
+  }
+
+  function makeChart(canvasId, color) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const s = getChartStyle();
+    return new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: [...(canvasId === 'cpuChart' ? cpuHistory : memHistory)],
+          borderColor: color,
+          backgroundColor: color + '22',
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: 0.3,
+          fill: true,
+          spanGaps: true,
+        }],
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: {
+            min: 0, max: 100,
+            ticks: { color: s.subtle, callback: v => v + '%' },
+            grid:  { color: s.border },
+          },
+        },
+      },
+    });
+  }
+
+  const cpuChart = makeChart('cpuChart', '#4f6ef7');
+  const memChart = makeChart('memChart', '#27ae60');
+
+  function pushHistory(d) {
+    cpuHistory.push(d.cpu_percent);
+    cpuHistory.shift();
+    memHistory.push(d.mem_percent);
+    memHistory.shift();
+    labels.push('');
+    labels.shift();
+  }
+
+  function updateCharts() {
+    const s = getChartStyle();
+    for (const chart of [cpuChart, memChart]) {
+      chart.data.labels = [...labels];
+      chart.options.scales.y.ticks.color = s.subtle;
+      chart.options.scales.y.grid.color  = s.border;
+    }
+    cpuChart.data.datasets[0].data = [...cpuHistory];
+    memChart.data.datasets[0].data = [...memHistory];
+    cpuChart.update('none');
+    memChart.update('none');
+  }
+
+  document.addEventListener('themechange', () => updateCharts());
+
+  async function refresh() {
+    try {
+      const res = await fetch('/admin/system/stats');
+      if (!res.ok) return;
+      const data = await res.json();
+      renderCards(data);
+      pushHistory(data);
+      updateCharts();
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+    } catch (e) {
+      console.error('Failed to fetch system stats:', e);
+    }
+  }
+
+  refresh();
+  setInterval(refresh, POLL_MS);
+})();
+</script>
+{% endblock %}

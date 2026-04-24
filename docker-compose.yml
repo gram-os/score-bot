@@ -25,6 +25,7 @@ services:
     env_file: .env
     volumes:
       - ./data:/data
+      - /sys/class/thermal:/sys/class/thermal:ro
     ports:
       - "8000:8000"
     depends_on:
