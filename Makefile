@@ -28,6 +28,13 @@ setup:
 	else \
 		echo "SECRET_KEY already set — skipping"; \
 	fi
+	@if grep -q '^WEBHOOK_SECRET=$$' .env; then \
+		SECRET=$$(openssl rand -hex 32); \
+		sed -i.bak "s|^WEBHOOK_SECRET=$$|WEBHOOK_SECRET=$$SECRET|" .env && rm -f .env.bak; \
+		echo "Generated WEBHOOK_SECRET"; \
+	else \
+		echo "WEBHOOK_SECRET already set — skipping"; \
+	fi
 	@echo ""
 	@echo "Next: fill in DISCORD_TOKEN, DISCORD_CHANNEL_ID, DISCORD_CLIENT_ID,"
 	@echo "      DISCORD_CLIENT_SECRET, and ADMIN_DISCORD_IDS in .env"
