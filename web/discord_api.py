@@ -1,8 +1,20 @@
+import urllib.parse
 from datetime import date, datetime, timezone
 
 import httpx
 
 DISCORD_EPOCH_MS = 1420070400000
+
+
+async def add_reaction(token: str, channel_id: int, message_id: str, emoji: str) -> None:
+    encoded = urllib.parse.quote(emoji)
+    headers = {"Authorization": f"Bot {token}"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.put(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me",
+            headers=headers,
+        )
+        resp.raise_for_status()
 
 
 def date_to_snowflake(d: date, end_of_day: bool = False) -> int:

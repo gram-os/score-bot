@@ -11,7 +11,7 @@ from bot.database import bulk_delete_submissions
 from bot.parsers.registry import all_parsers
 from web.backfill import process_messages
 from web.deps import _db_session, fetch_all_games, require_admin, templates
-from web.discord_api import fetch_channel_messages
+from web.discord_api import add_reaction, fetch_channel_messages
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -179,6 +179,13 @@ async def tools_backfill(
         len(backfill_result.duplicates),
         len(backfill_result.errors),
     )
+
+    for row in backfill_result.recorded:
+        if row.message_id and row.reaction:
+            try:
+                await add_reaction(token, channel_id, row.message_id, row.reaction)
+            except Exception:
+                log.warning("Could not react to message %s", row.message_id)
 
     return templates.TemplateResponse(
         request,

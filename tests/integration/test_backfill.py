@@ -88,6 +88,12 @@ class TestProcessMessages:
         result = process_messages(session, messages)
         assert result.messages_scanned == 2
 
+    def test_recorded_row_has_message_id_and_reaction(self, session, wordle_game):
+        messages = [make_message("99", "user1", "Alice", WORDLE_MSG, TS)]
+        result = process_messages(session, messages)
+        assert result.recorded[0].message_id == "99"
+        assert result.recorded[0].reaction != ""
+
     def test_skips_disabled_game(self, session):
         game = Game(
             id="wordle",
