@@ -131,6 +131,7 @@ class AppLog(Base):
     level: Mapped[str] = mapped_column(String, nullable=False)
     logger: Mapped[str] = mapped_column(String, nullable=False)
     message: Mapped[str] = mapped_column(String, nullable=False)
+    exc_text: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class AdminConfig(Base):

@@ -29,6 +29,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             overview: UserOverview = get_user_overview(session, user_id)
 
             season = get_current_season(session)
+            season_name = season.name if season else None
             season_row = None
             if season:
                 season_rows = get_leaderboard(session, period="season")
@@ -42,9 +43,19 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
                 if not bests:
                     continue
                 streak_row = get_user_streak(session, user_id, g.id)
-                game_stats.append((g, bests, streak_row))
+                game_stats.append(
+                    (
+                        g.name,
+                        bests,
+                        streak_row.current_streak if streak_row else 0,
+                        streak_row.longest_streak if streak_row else 0,
+                        streak_row.freeze_count if streak_row else 0,
+                    )
+                )
 
             user_achievements = get_user_achievements(session, user_id)
+            earned_ach_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
+            badges = format_badges(user_achievements, separator=" · ")
             log_usage_event(session, "command.mystats", user_id, interaction.user.display_name)
             session.commit()
 
@@ -60,21 +71,17 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             inline=False,
         )
 
-        if season:
+        if season_name:
             s_rank = f"#{season_row.rank}" if season_row else "Unranked"
             s_pts = season_row.total_score if season_row else 0.0
             s_subs = season_row.submission_count if season_row else 0
             embed.add_field(
-                name=f"Season ({season.name})",
+                name=f"Season ({season_name})",
                 value=f"{s_rank} · {s_pts:.0f} pts · {s_subs} submissions",
                 inline=False,
             )
 
-        for g, bests, streak_data in game_stats:
-            cur = streak_data.current_streak if streak_data else 0
-            best_streak = streak_data.longest_streak if streak_data else 0
-            freezes = streak_data.freeze_count if streak_data else 0
-
+        for game_name, bests, cur, best_streak, freezes in game_stats:
             if cur >= 1:
                 streak_str = f"🔥 {cur} day streak"
                 if best_streak > cur:
@@ -84,7 +91,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             freeze_str = f" · 🧊 {freezes} freeze{'s' if freezes != 1 else ''}" if freezes > 0 else ""
 
             embed.add_field(
-                name=g.name,
+                name=game_name,
                 value=(
                     f"{bests.count} subs · Best: {bests.best_score:.0f} · "
                     f"Avg: {bests.avg_score:.1f}\n"
@@ -93,10 +100,9 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
                 inline=True,
             )
 
-        if user_achievements:
-            badges = format_badges(user_achievements, separator=" · ")
+        if earned_ach_count:
             embed.add_field(
-                name=f"Achievements ({sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)})",
+                name=f"Achievements ({earned_ach_count})",
                 value=badges,
                 inline=False,
             )

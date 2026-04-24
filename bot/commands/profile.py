@@ -26,6 +26,8 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             season_label = season.name if season else None
             best_current, best_ever = get_user_best_streaks(session, target_id)
             user_achievements = get_user_achievements(session, target_id)
+            earned_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
+            achievement_badges = format_badges(user_achievements)
             log_usage_event(
                 session,
                 "command.profile",
@@ -35,7 +37,6 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             )
             session.commit()
 
-        earned_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
         total_achievements = len(ACHIEVEMENTS)
         avg_score = overview.total_pts / overview.total_subs if overview.total_subs else 0.0
 
@@ -67,7 +68,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
 
         embed.add_field(
             name=f"🏆 Achievements ({earned_count} / {total_achievements})",
-            value=format_badges(user_achievements),
+            value=achievement_badges,
             inline=False,
         )
 

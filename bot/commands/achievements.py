@@ -21,6 +21,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
 
         with Session() as session:
             user_achievements = get_user_achievements(session, target_id)
+            earned_slugs = {ua.achievement_slug for ua in user_achievements}
             log_usage_event(
                 session,
                 "command.achievements",
@@ -30,7 +31,6 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             )
             session.commit()
 
-        earned_slugs = {ua.achievement_slug for ua in user_achievements}
         total = len(ACHIEVEMENTS)
         earned_count = len(earned_slugs & ACHIEVEMENTS.keys())
 
