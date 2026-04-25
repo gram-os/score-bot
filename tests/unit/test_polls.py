@@ -1,8 +1,7 @@
+import asyncio
 import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 from bot.tasks.polls import _FINALIZATION_GRACE, run_poll_cycle
 
@@ -24,93 +23,71 @@ def _make_discord_poll(is_finalized: bool, yes_votes: int = 0, no_votes: int = 0
     return SimpleNamespace(is_finalized=is_finalized, answers=[yes, no])
 
 
-@pytest.mark.asyncio
-async def test_resolve_skipped_within_grace_period():
-    now = datetime.datetime.utcnow()
-    expires_at = now + datetime.timedelta(minutes=2)  # not yet expired
-    record = _make_poll_record("999", expires_at)
-
-    channel = AsyncMock()
+def _make_session(inner_session=None):
     session_ctx = MagicMock()
-    Session = MagicMock(return_value=session_ctx)
-    session_ctx.__enter__ = MagicMock(return_value=MagicMock())
+    session_ctx.__enter__ = MagicMock(return_value=inner_session or MagicMock())
     session_ctx.__exit__ = MagicMock(return_value=False)
+    return MagicMock(return_value=session_ctx)
+
+
+def test_resolve_skipped_within_grace_period():
+    now = datetime.datetime.utcnow()
+    record = _make_poll_record("999", expires_at=now + datetime.timedelta(minutes=2))
+    channel = AsyncMock()
 
     with patch("bot.tasks.polls.get_latest_unnotified_poll", return_value=record):
         with patch("bot.tasks.polls.get_unpolled_suggestions", return_value=[]):
-            await run_poll_cycle(MagicMock(), channel, Session, [])
+            asyncio.run(run_poll_cycle(MagicMock(), channel, _make_session(), []))
 
     channel.fetch_message.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_resolve_skipped_within_grace_period_after_expiry():
+def test_resolve_skipped_within_grace_period_after_expiry():
     now = datetime.datetime.utcnow()
     # Expired 2 minutes ago — inside the 5-minute grace window
-    expires_at = now - datetime.timedelta(minutes=2)
-    record = _make_poll_record("999", expires_at)
-
+    record = _make_poll_record("999", expires_at=now - datetime.timedelta(minutes=2))
     channel = AsyncMock()
-    session_ctx = MagicMock()
-    Session = MagicMock(return_value=session_ctx)
-    session_ctx.__enter__ = MagicMock(return_value=MagicMock())
-    session_ctx.__exit__ = MagicMock(return_value=False)
 
     with patch("bot.tasks.polls.get_latest_unnotified_poll", return_value=record):
         with patch("bot.tasks.polls.get_unpolled_suggestions", return_value=[]):
-            await run_poll_cycle(MagicMock(), channel, Session, [])
+            asyncio.run(run_poll_cycle(MagicMock(), channel, _make_session(), []))
 
     channel.fetch_message.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_resolve_proceeds_after_grace_period():
+def test_resolve_proceeds_after_grace_period():
     now = datetime.datetime.utcnow()
     # Expired 10 minutes ago — well past the grace window
-    expires_at = now - _FINALIZATION_GRACE - datetime.timedelta(minutes=5)
-    record = _make_poll_record("999", expires_at)
+    record = _make_poll_record("999", expires_at=now - _FINALIZATION_GRACE - datetime.timedelta(minutes=5))
 
     discord_poll = _make_discord_poll(is_finalized=True, yes_votes=3, no_votes=1)
-    msg = SimpleNamespace(poll=discord_poll)
-
     channel = AsyncMock()
-    channel.fetch_message = AsyncMock(return_value=msg)
+    channel.fetch_message = AsyncMock(return_value=SimpleNamespace(poll=discord_poll))
 
     inner_session = MagicMock()
-    session_ctx = MagicMock()
-    session_ctx.__enter__ = MagicMock(return_value=inner_session)
-    session_ctx.__exit__ = MagicMock(return_value=False)
-    Session = MagicMock(return_value=session_ctx)
 
     with patch("bot.tasks.polls.get_latest_unnotified_poll", return_value=record):
         with patch("bot.tasks.polls.get_unpolled_suggestions", return_value=[]):
             with patch("bot.tasks.polls.mark_poll_notified") as mock_notify:
-                await run_poll_cycle(MagicMock(), channel, Session, [])
+                asyncio.run(run_poll_cycle(MagicMock(), channel, _make_session(inner_session), []))
 
     channel.fetch_message.assert_called_once_with(999)
     mock_notify.assert_called_once_with(inner_session, record.id)
 
 
-@pytest.mark.asyncio
-async def test_resolve_proceeds_with_no_expires_at():
+def test_resolve_proceeds_with_no_expires_at():
     record = _make_poll_record("999", expires_at=None)
 
     discord_poll = _make_discord_poll(is_finalized=True, yes_votes=2, no_votes=0)
-    msg = SimpleNamespace(poll=discord_poll)
-
     channel = AsyncMock()
-    channel.fetch_message = AsyncMock(return_value=msg)
+    channel.fetch_message = AsyncMock(return_value=SimpleNamespace(poll=discord_poll))
 
     inner_session = MagicMock()
-    session_ctx = MagicMock()
-    session_ctx.__enter__ = MagicMock(return_value=inner_session)
-    session_ctx.__exit__ = MagicMock(return_value=False)
-    Session = MagicMock(return_value=session_ctx)
 
     with patch("bot.tasks.polls.get_latest_unnotified_poll", return_value=record):
         with patch("bot.tasks.polls.get_unpolled_suggestions", return_value=[]):
             with patch("bot.tasks.polls.mark_poll_notified") as mock_notify:
-                await run_poll_cycle(MagicMock(), channel, Session, [])
+                asyncio.run(run_poll_cycle(MagicMock(), channel, _make_session(inner_session), []))
 
     channel.fetch_message.assert_called_once_with(999)
     mock_notify.assert_called_once_with(inner_session, record.id)
