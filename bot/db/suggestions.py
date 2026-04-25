@@ -45,9 +45,11 @@ def create_daily_poll(
     message_id: str,
     is_yes_no: bool,
     suggestion_ids: list[int],
+    expires_at: datetime | None = None,
 ) -> DailyPoll:
     poll = DailyPoll(
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        expires_at=expires_at,
         message_id=message_id,
         is_yes_no=is_yes_no,
         notified=False,
