@@ -25,6 +25,7 @@ env/
 
 # Docker
 *.log
+docker-compose.override.yml
 
 # IDE
 .vscode/
