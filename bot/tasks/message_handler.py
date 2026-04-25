@@ -14,6 +14,7 @@ from bot.database import (
     record_submission,
     update_streak_on_submission,
 )
+from bot.db.config import set_config
 
 log = logging.getLogger(__name__)
 
@@ -175,6 +176,9 @@ async def handle_message(
                 )
                 await message.add_reaction("⚠️")
         break
+
+    with Session() as session:
+        set_config(session, "last_seen_message_id", str(message.id))
 
 
 async def _dm_user(client: discord.Client, user_id: str, message: str) -> None:
