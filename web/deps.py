@@ -24,6 +24,11 @@ def _admin_ids() -> set[str]:
     return {uid.strip() for uid in raw.split(",") if uid.strip()}
 
 
+def _homunculus_viewer_ids() -> set[str]:
+    raw = os.environ.get("HOMUNCULUS_VIEWER_IDS", "")
+    return {uid.strip() for uid in raw.split(",") if uid.strip()}
+
+
 def _db_session() -> Session:
     engine = get_engine()
     return Session(engine)
@@ -33,7 +38,15 @@ async def require_admin(request: Request) -> dict:
     user_id = request.session.get("user_id")
     if not user_id or user_id not in _admin_ids():
         raise NotAuthenticated()
-    return {"user_id": user_id, "username": request.session.get("username", "")}
+    return {"user_id": user_id, "username": request.session.get("username", ""), "role": "admin"}
+
+
+async def require_homunculus_access(request: Request) -> dict:
+    user_id = request.session.get("user_id")
+    role = request.session.get("role", "")
+    if not user_id or role not in ("admin", "homunculus_viewer"):
+        raise NotAuthenticated()
+    return {"user_id": user_id, "username": request.session.get("username", ""), "role": role}
 
 
 def fetch_all_games(db: Session) -> list[Game]:

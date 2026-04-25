@@ -70,6 +70,7 @@ class DailyPoll(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     message_id: Mapped[str] = mapped_column(String, nullable=False)
     is_yes_no: Mapped[bool] = mapped_column(Boolean, nullable=False)
     notified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -150,6 +151,17 @@ class UsageEvent(Base):
     username: Mapped[str | None] = mapped_column(String, nullable=True)
     event_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class HomunculusUpgrade(Base):
+    __tablename__ = "homunculus_upgrades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    upgrade_text: Mapped[str] = mapped_column(String, nullable=False)
+    vote_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    poll_question: Mapped[str] = mapped_column(String, nullable=False)
+    message_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
 def get_engine(db_path: str | None = None):

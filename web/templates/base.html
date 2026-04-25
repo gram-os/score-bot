@@ -237,6 +237,8 @@
   <header>
     <h1>Score Bot</h1>
     <nav>
+      {% set _role = request.session.get('role', 'admin') %}
+      {% if _role == 'admin' %}
       <a href="/admin/submissions" {% if active == 'submissions' %}class="active"{% endif %}>Submissions</a>
       <a href="/admin/live" {% if active == 'live' %}class="active"{% endif %}>Live</a>
       <a href="/admin/leaderboard" {% if active == 'leaderboard' %}class="active"{% endif %}>Leaderboard</a>
@@ -248,6 +250,8 @@
       <a href="/admin/usage" {% if active == 'usage' %}class="active"{% endif %}>Usage</a>
       <a href="/admin/config" {% if active == 'config' %}class="active"{% endif %}>Config</a>
       <a href="/admin/system" {% if active == 'system' %}class="active"{% endif %}>System</a>
+      {% endif %}
+      <a href="/admin/homunculus" {% if active == 'homunculus' %}class="active"{% endif %}>Homunculus</a>
     </nav>
     <div class="header-actions">
       <button class="theme-btn" id="darkToggle" title="Toggle dark mode">Dark</button>

@@ -12,6 +12,12 @@ ADMIN_DISCORD_IDS: list[int] = [
     int(uid.strip()) for uid in os.environ.get("ADMIN_DISCORD_IDS", "").split(",") if uid.strip()
 ]
 
+_homunculus_channel = os.environ.get("HOMUNCULUS_CHANNEL_ID", "")
+HOMUNCULUS_CHANNEL_ID: int | None = int(_homunculus_channel) if _homunculus_channel else None
+
+_homunculus_author = os.environ.get("HOMUNCULUS_AUTHOR_ID", "")
+HOMUNCULUS_AUTHOR_ID: int | None = int(_homunculus_author) if _homunculus_author else None
+
 _DIGEST_TIME = os.environ.get("DIGEST_TIME", "09:00")
 _digest_hour, _digest_minute = (int(x) for x in _DIGEST_TIME.split(":"))
 DIGEST_HOUR: int = _digest_hour

@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.config import Config
 
-from web.deps import _admin_ids, require_admin
+from web.deps import _admin_ids, _homunculus_viewer_ids, require_homunculus_access
 from web.routes import config as config_routes
-from web.routes import games, leaderboard, live, logs, stats, submissions, system, tools, usage, users
+from web.routes import games, homunculus, leaderboard, live, logs, stats, submissions, system, tools, usage, users
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +55,11 @@ async def callback(request: Request):
     user_id = user["id"]
     username = user.get("username", user_id)
 
-    if user_id not in _admin_ids():
+    if user_id in _admin_ids():
+        role = "admin"
+    elif user_id in _homunculus_viewer_ids():
+        role = "homunculus_viewer"
+    else:
         log.warning("Unauthorized login attempt by %s (id=%s)", username, user_id)
         return HTMLResponse(
             content="<h1>403 Forbidden</h1><p>Your account is not authorized to access this panel.</p>",
@@ -64,7 +68,8 @@ async def callback(request: Request):
 
     request.session["user_id"] = user_id
     request.session["username"] = username
-    log.info("Admin login: %s (id=%s)", username, user_id)
+    request.session["role"] = role
+    log.info("Login: %s (id=%s, role=%s)", username, user_id, role)
     return RedirectResponse(url="/admin", status_code=302)
 
 
@@ -77,7 +82,9 @@ async def logout(request: Request):
 
 
 @admin_router.get("")
-async def admin_index(session: dict = Depends(require_admin)):
+async def admin_index(request: Request, session: dict = Depends(require_homunculus_access)):
+    if session.get("role") == "homunculus_viewer":
+        return RedirectResponse(url="/admin/homunculus", status_code=302)
     return RedirectResponse(url="/admin/submissions", status_code=302)
 
 
@@ -92,3 +99,4 @@ admin_router.include_router(config_routes.router)
 admin_router.include_router(leaderboard.router)
 admin_router.include_router(usage.router)
 admin_router.include_router(system.router)
+admin_router.include_router(homunculus.router)

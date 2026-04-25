@@ -10,6 +10,8 @@ from bot.database import (
     mark_poll_notified,
 )
 
+_FINALIZATION_GRACE = datetime.timedelta(minutes=5)
+
 log = logging.getLogger(__name__)
 
 
@@ -38,6 +40,12 @@ async def _resolve_pending_poll(
         if not prev:
             return
 
+        if prev.expires_at is not None:
+            grace_deadline = prev.expires_at + _FINALIZATION_GRACE
+            if datetime.datetime.utcnow() < grace_deadline:
+                log.info("Poll %s grace period not elapsed; skipping resolution", prev.message_id)
+                return
+
         resolved = False
         try:
             msg = await channel.fetch_message(int(prev.message_id))
@@ -59,29 +67,32 @@ async def _post_new_poll(channel: discord.TextChannel, Session) -> None:
         if not suggestions:
             return
 
+        poll_duration = datetime.timedelta(hours=4)
         is_yes_no = len(suggestions) == 1
         if is_yes_no:
             game = suggestions[0].game_name
             poll = discord.Poll(
                 question=f"Should we add {game} to the bot?",
-                duration=datetime.timedelta(hours=4),
+                duration=poll_duration,
             )
             poll.add_answer(text="Yes", emoji="✅")
             poll.add_answer(text="No", emoji="❌")
         else:
             poll = discord.Poll(
                 question="Which game should we add to the bot next?",
-                duration=datetime.timedelta(hours=4),
+                duration=poll_duration,
             )
             for s in suggestions:
                 poll.add_answer(text=s.game_name)
 
+        expires_at = datetime.datetime.utcnow() + poll_duration
         msg = await channel.send(poll=poll)
         create_daily_poll(
             session,
             message_id=str(msg.id),
             is_yes_no=is_yes_no,
             suggestion_ids=[s.id for s in suggestions],
+            expires_at=expires_at,
         )
         session.commit()
         log.info("Posted suggestion poll with %d option(s)", len(suggestions))
