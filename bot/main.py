@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import tasks
 from sqlalchemy.orm import sessionmaker
 
-from bot.commands import achievements, best, games, help, leaderboard, mystats, profile, remind, suggest, vs
+from bot.commands import achievements, best, games, help, homunculus, leaderboard, mystats, profile, remind, suggest, vs
 from bot.config import (
     ADMIN_DISCORD_IDS,
     DATABASE_PATH,
@@ -15,6 +15,8 @@ from bot.config import (
     DIGEST_MINUTE,
     DISCORD_CHANNEL_ID,
     DISCORD_TOKEN,
+    HOMUNCULUS_AUTHOR_ID,
+    HOMUNCULUS_CHANNEL_ID,
     REMINDER_HOUR,
     REMINDER_MINUTE,
 )
@@ -22,11 +24,12 @@ from bot.database import get_engine
 from bot.log_handler import setup_db_logging
 from bot.parsers.registry import ParserRegistry
 from bot.tasks import digests, message_handler, polls, reminders
+from bot.tasks import homunculus as homunculus_task
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-_COMMAND_MODULES = [leaderboard, games, suggest, vs, best, mystats, profile, achievements, remind, help]
+_COMMAND_MODULES = [leaderboard, games, suggest, vs, best, mystats, profile, achievements, remind, help, homunculus]
 
 
 class ScoreBot(discord.Client):
@@ -61,6 +64,9 @@ class ScoreBot(discord.Client):
         if not self.daily_suggestion_poll.is_running():
             self.daily_suggestion_poll.start()
 
+        if HOMUNCULUS_CHANNEL_ID and not self.homunculus_poll_check.is_running():
+            self.homunculus_poll_check.start()
+
         if not self._scheduler.running:
             self._scheduler.add_job(
                 self._send_daily_digest,
@@ -90,6 +96,13 @@ class ScoreBot(discord.Client):
     async def daily_suggestion_poll(self) -> None:
         channel = self.get_channel(DISCORD_CHANNEL_ID)
         await polls.run_poll_cycle(self, channel, self.Session, ADMIN_DISCORD_IDS)
+
+    @tasks.loop(hours=1)
+    async def homunculus_poll_check(self) -> None:
+        if HOMUNCULUS_CHANNEL_ID and HOMUNCULUS_AUTHOR_ID:
+            await homunculus_task.check_homunculus_polls(
+                self, HOMUNCULUS_CHANNEL_ID, HOMUNCULUS_AUTHOR_ID, self.Session
+            )
 
     async def _send_daily_digest(self) -> None:
         channel = self.get_channel(DISCORD_CHANNEL_ID)

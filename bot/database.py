@@ -1,6 +1,7 @@
 from bot.db.achievements import award_season_champion, get_user_achievements
 from bot.db.config import get_config, set_config
 from bot.db.head_to_head import HeadToHeadResult, get_head_to_head
+from bot.db.homunculus import add_homunculus_upgrade, get_homunculus_upgrades, homunculus_upgrade_exists
 from bot.db.leaderboard import LeaderboardRow, get_leaderboard
 from bot.db.logs import get_logs
 from bot.db.models import (
@@ -10,6 +11,7 @@ from bot.db.models import (
     DailyPoll,
     Game,
     GameSuggestion,
+    HomunculusUpgrade,
     Season,
     Submission,
     User,
@@ -62,6 +64,7 @@ __all__ = [
     "DailyPoll",
     "Game",
     "GameSuggestion",
+    "HomunculusUpgrade",
     "Season",
     "Submission",
     "User",
@@ -115,4 +118,7 @@ __all__ = [
     "get_usage_events",
     "get_usage_summary",
     "log_usage_event",
+    "add_homunculus_upgrade",
+    "get_homunculus_upgrades",
+    "homunculus_upgrade_exists",
 ]

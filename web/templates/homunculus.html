@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Homunculus — Score Bot{% endblock %}
+{% block content %}
+<h2>The Homunculus</h2>
+
+{% if upgrades %}
+<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">
+  {{ upgrades | length }} upgrade{{ 's' if upgrades | length != 1 else '' }} so far
+</p>
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Upgrade</th>
+      <th>Poll Question</th>
+      <th>Votes</th>
+      <th>Recorded</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for upgrade in upgrades %}
+    <tr>
+      <td style="color: var(--text-muted); font-weight: 600;">{{ loop.index }}</td>
+      <td style="font-weight: 600;">{{ upgrade.upgrade_text }}</td>
+      <td style="color: var(--text-muted);">{{ upgrade.poll_question }}</td>
+      <td>{{ upgrade.vote_count }}</td>
+      <td style="color: var(--text-subtle);">{{ upgrade.recorded_at.strftime('%Y-%m-%d') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">The homunculus has no upgrades yet. Check back after the next poll!</div>
+{% endif %}
+{% endblock %}
