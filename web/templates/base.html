@@ -231,12 +231,101 @@
     .badge-info { background: var(--badge-glyph-bg); color: var(--badge-glyph-text); }
     .badge-warning { background: var(--c-warning-bg); color: var(--c-warning-text); }
     .badge-error { background: var(--flash-err-bg); color: var(--flash-err-text); }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Hamburger button — hidden on desktop */
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 26px;
+      height: 18px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .nav-toggle span {
+      display: block;
+      width: 100%;
+      height: 2px;
+      background: rgba(255,255,255,0.8);
+      border-radius: 2px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .nav-toggle.open span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+    @media (max-width: 768px) {
+      /* Header */
+      header { flex-wrap: wrap; padding: 10px 16px; gap: 8px; align-items: center; }
+      header h1 { flex: 1; }
+      .nav-toggle { display: flex; }
+      .header-actions { order: 2; flex-shrink: 0; }
+      nav {
+        display: none;
+        order: 3;
+        flex-direction: column;
+        width: 100%;
+        flex: 0 0 100%;
+        gap: 2px;
+        padding: 6px 0 4px;
+      }
+      nav.open { display: flex; }
+      nav a { padding: 8px 10px; font-size: 14px; }
+
+      /* Layout */
+      main { padding: 16px; }
+      h2 { font-size: 16px; }
+
+      /* Tables: scroll horizontally; outline replaces border since overflow:hidden conflicts with scrolling */
+      table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border: none;
+        outline: 1px solid var(--border);
+        border-radius: 6px;
+      }
+
+      /* Filters: stack full-width */
+      .filters { flex-direction: column; align-items: stretch; }
+      .filter-group { width: 100%; }
+      .filter-group input, .filter-group select { width: 100%; box-sizing: border-box; }
+
+      /* Override inline fixed-width inputs (logs, users, config) */
+      .filters input[style], .filters select[style] { width: 100% !important; }
+
+      /* Stat cards: two per row */
+      .stat-card { flex: 1 1 calc(50% - 6px); min-width: 0; }
+
+      /* Larger tap targets */
+      .btn { padding: 8px 14px; min-height: 36px; }
+      .theme-btn { padding: 5px 10px; }
+
+      /* Pagination wrap */
+      .pagination { flex-wrap: wrap; }
+
+      /* System chart grid: single column */
+      .chart-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 480px) {
+      .stat-card { flex: 1 1 100%; }
+      td, th { padding: 7px 8px; }
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>Score Bot</h1>
-    <nav>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="mainNav">
       {% set _role = request.session.get('role', 'admin') %}
       {% if _role == 'admin' %}
       <a href="/admin/submissions" {% if active == 'submissions' %}class="active"{% endif %}>Submissions</a>
@@ -356,6 +445,24 @@
           th.appendChild(icon);
         });
       });
+    });
+  })();
+
+  (function () {
+    var toggle = document.getElementById('navToggle');
+    var nav = document.getElementById('mainNav');
+    if (!toggle || !nav) return;
+    toggle.addEventListener('click', function () {
+      var isOpen = nav.classList.toggle('open');
+      toggle.classList.toggle('open', isOpen);
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+    nav.addEventListener('click', function (e) {
+      if (e.target.tagName === 'A') {
+        nav.classList.remove('open');
+        toggle.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
     });
   })();
   </script>
