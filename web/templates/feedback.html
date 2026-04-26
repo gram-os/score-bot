@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Feedback — Score Bot Admin{% endblock %}
+{% block content %}
+<style>
+  .category-bug       { background: color-mix(in srgb, var(--c-danger) 15%, transparent);   color: var(--c-danger);   border: 1px solid var(--c-danger); }
+  .category-feature   { background: color-mix(in srgb, var(--c-success) 15%, transparent);  color: var(--c-success);  border: 1px solid var(--c-success); }
+  .category-general   { background: var(--c-secondary-bg); color: var(--c-secondary-text); border: 1px solid var(--border-light); }
+  .category-other     { background: var(--c-warning-bg);   color: var(--c-warning-text);   border: 1px solid var(--c-warning-border); }
+
+  .feedback-content {
+    max-width: 480px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+  <h2 style="margin-bottom:0;">Feedback</h2>
+  <span class="text-muted" style="font-size:12px;">{{ entries|length }} total</span>
+</div>
+
+{% if entries %}
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>Date</th><th>User</th><th>Category</th><th>Feedback</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in entries %}
+    {% set cat_class = {
+      "Bug Report": "category-bug",
+      "Feature Request": "category-feature",
+      "General Feedback": "category-general",
+      "Other": "category-other"
+    }.get(e.category, "category-general") %}
+    <tr>
+      <td class="text-subtle">{{ e.id }}</td>
+      <td class="text-muted" style="white-space:nowrap;">{{ e.submitted_at }}</td>
+      <td>{{ e.username }}</td>
+      <td><span class="badge {{ cat_class }}">{{ e.category }}</span></td>
+      <td class="feedback-content text-muted">{{ e.content }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No feedback yet.</div>
+{% endif %}
+{% endblock %}

@@ -166,6 +166,17 @@ class HomunculusUpgrade(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(String, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 def get_engine(db_path: str | None = None):
     path = db_path or os.environ.get("DATABASE_PATH", "/data/scores.db")
     return create_engine(f"sqlite:///{path}")

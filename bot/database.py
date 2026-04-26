@@ -23,6 +23,7 @@ from bot.db.analytics import (
     get_users_for_h2h,
 )
 from bot.db.config import get_config, set_config
+from bot.db.feedback import add_feedback, get_all_feedback
 from bot.db.head_to_head import HeadToHeadResult, get_head_to_head
 from bot.db.homunculus import add_homunculus_upgrade, get_homunculus_upgrades, homunculus_upgrade_exists
 from bot.db.leaderboard import LeaderboardRow, get_leaderboard
@@ -32,6 +33,7 @@ from bot.db.models import (
     AppLog,
     Base,
     DailyPoll,
+    Feedback,
     Game,
     GameSuggestion,
     HomunculusUpgrade,
@@ -85,6 +87,7 @@ __all__ = [
     "AppLog",
     "Base",
     "DailyPoll",
+    "Feedback",
     "Game",
     "GameDifficultyMetrics",
     "GameDifficultyRow",
@@ -106,9 +109,11 @@ __all__ = [
     "UsageEvent",
     "get_engine",
     "UserSummary",
+    "add_feedback",
     "add_submission_manual",
     "bulk_delete_submissions",
     "delete_submission",
+    "get_all_feedback",
     "get_avg_score_over_time",
     "get_game_difficulty_comparison",
     "get_game_difficulty_metrics",

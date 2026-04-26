@@ -9,6 +9,7 @@ from starlette.config import Config
 
 from web.deps import _admin_ids, _homunculus_viewer_ids, require_homunculus_access
 from web.routes import (
+    feedback,
     games,
     homunculus,
     leaderboard,
@@ -103,6 +104,7 @@ admin_router.include_router(submissions.router)
 admin_router.include_router(games.router)
 admin_router.include_router(stats.router)
 admin_router.include_router(suggestions.router)
+admin_router.include_router(feedback.router)
 admin_router.include_router(live.router)
 admin_router.include_router(leaderboard.router)
 admin_router.include_router(tools.router)
