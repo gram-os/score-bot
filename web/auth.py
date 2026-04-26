@@ -8,8 +8,19 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.config import Config
 
 from web.deps import _admin_ids, _homunculus_viewer_ids, require_homunculus_access
-from web.routes import config as config_routes
-from web.routes import games, homunculus, leaderboard, live, logs, stats, submissions, system, tools, usage, users
+from web.routes import (
+    games,
+    homunculus,
+    leaderboard,
+    live,
+    monitoring,
+    stats,
+    submissions,
+    suggestions,
+    system,
+    tools,
+    users,
+)
 
 log = logging.getLogger(__name__)
 
@@ -90,13 +101,12 @@ async def admin_index(request: Request, session: dict = Depends(require_homuncul
 
 admin_router.include_router(submissions.router)
 admin_router.include_router(games.router)
-admin_router.include_router(live.router)
 admin_router.include_router(stats.router)
+admin_router.include_router(suggestions.router)
+admin_router.include_router(live.router)
+admin_router.include_router(leaderboard.router)
 admin_router.include_router(tools.router)
 admin_router.include_router(users.router)
-admin_router.include_router(logs.router)
-admin_router.include_router(config_routes.router)
-admin_router.include_router(leaderboard.router)
-admin_router.include_router(usage.router)
+admin_router.include_router(monitoring.router)
 admin_router.include_router(system.router)
 admin_router.include_router(homunculus.router)

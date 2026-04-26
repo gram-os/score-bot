@@ -1,167 +1,258 @@
 {% extends "base.html" %}
 {% block title %}Stats — Score Bot Admin{% endblock %}
 {% block content %}
-<h2>Submission Timeline</h2>
+<h2>Stats</h2>
 
-<div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;">
-  <span style="font-size:13px;color:var(--text-muted);margin-right:4px;">Window:</span>
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
+  <div class="stat-card">
+    <div class="stat-label">Submissions Today</div>
+    <div class="stat-value">{{ kpi.total_submissions }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Active Players Today</div>
+    <div class="stat-value">{{ kpi.active_players }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Most Popular Game (Week)</div>
+    <div class="stat-value" style="font-size:14px;padding-top:4px;">{{ kpi.most_popular_game or "—" }}</div>
+  </div>
+  <div class="stat-card" {% if kpi.games_with_zero %}title="No submissions today: {{ kpi.games_with_zero | join(', ') }}"{% endif %}>
+    <div class="stat-label">Games Silent Today</div>
+    <div class="stat-value" style="color:{% if kpi.games_with_zero %}var(--c-danger){% else %}var(--c-success){% endif %};">
+      {{ kpi.games_with_zero | length }}
+    </div>
+    {% if kpi.games_with_zero %}
+    <div style="font-size:10px;color:var(--text-subtle);margin-top:4px;font-family:'Courier New',monospace;">
+      {{ kpi.games_with_zero | join(", ") }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Submission Timeline</div>
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
   <button class="btn btn-secondary day-btn" data-days="7">7 days</button>
   <button class="btn btn-secondary day-btn" data-days="30">30 days</button>
   <button class="btn btn-secondary day-btn" data-days="90">90 days</button>
 </div>
+<div class="card" style="padding:16px;margin-bottom:24px;">
+  <div style="position:relative;height:240px;">
+    <canvas id="timelineChart"></canvas>
+  </div>
+  <p id="timelineEmpty" style="display:none;text-align:center;color:var(--text-subtle);padding:32px 0;font-size:13px;">No submissions in this period.</p>
+</div>
 
-<div class="card" style="padding:16px;">
-  <canvas id="submissionsChart" height="80"></canvas>
-  <p id="emptyMsg" style="display:none;text-align:center;color:var(--text-subtle);padding:32px 0;font-size:13px;">No submissions in this period.</p>
+<div class="chart-grid" style="margin-bottom:24px;">
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Game Difficulty (avg base score, lower = harder)</div>
+    <div class="card" style="padding:16px;">
+      <div style="position:relative;height:280px;">
+        <canvas id="difficultyChart"></canvas>
+      </div>
+      <p id="difficultyEmpty" style="display:none;text-align:center;color:var(--text-subtle);padding:32px 0;font-size:13px;">No data.</p>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Speed Bonus Leaders</div>
+    {% if speed_leaders %}
+    <table>
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Bonuses Earned</th>
+          <th>Total Bonus Pts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in speed_leaders %}
+        <tr>
+          <td>{{ p.username }}</td>
+          <td>{{ p.speed_bonus_count }}</td>
+          <td><strong>+{{ p.total_bonus_points }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No speed bonus data yet.</div>
+    {% endif %}
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
 <script>
 (function () {
-  const COLORS_NORMAL = [
-    '#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad',
-    '#16a085','#d35400','#2980b9','#c0392b','#1abc9c',
-  ];
-  const COLORS_CB = [
-    '#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7',
-    '#009E73','#F0E442','#AA3377','#CCBB44','#44BB99',
-  ];
+  const COLORS_N = ['#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2980b9','#c0392b','#1abc9c'];
+  const COLORS_CB = ['#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7','#009E73','#F0E442','#AA3377','#CCBB44','#44BB99'];
 
   function getColors() {
-    return document.documentElement.getAttribute('data-cb') === 'deuteranopia'
-      ? COLORS_CB : COLORS_NORMAL;
+    return document.documentElement.getAttribute('data-cb') === 'deuteranopia' ? COLORS_CB : COLORS_N;
   }
-
-  function getChartStyle() {
-    var s = getComputedStyle(document.documentElement);
+  function getStyle() {
+    const s = getComputedStyle(document.documentElement);
     return {
-      text: s.getPropertyValue('--text').trim() || '#222',
+      text:   s.getPropertyValue('--text').trim()        || '#222',
       subtle: s.getPropertyValue('--text-subtle').trim() || '#999',
-      border: s.getPropertyValue('--border').trim() || '#ddd',
+      border: s.getPropertyValue('--border').trim()      || '#ddd',
+      primary: s.getPropertyValue('--c-primary').trim()  || '#e0457a',
     };
   }
 
-  let chart = null;
-  let activeDays = 30;
+  /* ── Timeline chart (reuses /admin/stats/submissions) ── */
+  let timelineChart = null;
 
   function setActiveBtn(days) {
     document.querySelectorAll('.day-btn').forEach(btn => {
-      const isActive = parseInt(btn.dataset.days) === days;
-      btn.classList.toggle('btn-primary', isActive);
-      btn.classList.toggle('btn-secondary', !isActive);
+      const active = parseInt(btn.dataset.days) === days;
+      btn.classList.toggle('btn-primary', active);
+      btn.classList.toggle('btn-secondary', !active);
     });
   }
 
-  async function fetchAndRender(days) {
-    activeDays = days;
+  async function fetchTimeline(days) {
     setActiveBtn(days);
-
     let data;
     try {
-      const res = await fetch(`/admin/stats/submissions?days=${days}`);
+      const res = await fetch('/admin/stats/submissions?days=' + days);
       data = await res.json();
-    } catch (e) {
-      console.error('Failed to fetch stats:', e);
-      return;
-    }
+    } catch (e) { return; }
 
-    const emptyMsg = document.getElementById('emptyMsg');
-    const canvas = document.getElementById('submissionsChart');
-
+    const canvas = document.getElementById('timelineChart');
+    const empty  = document.getElementById('timelineEmpty');
     if (!data.length) {
       canvas.style.display = 'none';
-      emptyMsg.style.display = 'block';
-      if (chart) { chart.destroy(); chart = null; }
+      empty.style.display = 'block';
+      if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
       return;
     }
     canvas.style.display = 'block';
-    emptyMsg.style.display = 'none';
+    empty.style.display = 'none';
 
-    const gameMap = {};
-    const dateSet = new Set();
+    const gameMap = {}, dateSet = new Set();
     for (const row of data) {
       dateSet.add(row.date);
       if (!gameMap[row.game]) gameMap[row.game] = {};
       gameMap[row.game][row.date] = row.count;
     }
-    const dates = Array.from(dateSet).sort();
-    const games = Object.keys(gameMap).sort();
+    const dates  = Array.from(dateSet).sort();
+    const games  = Object.keys(gameMap).sort();
     const colors = getColors();
-    const s = getChartStyle();
-
-    const datasets = games.map((game, i) => ({
-      label: game,
-      data: dates.map(d => gameMap[game][d] ?? 0),
+    const s      = getStyle();
+    const datasets = games.map((g, i) => ({
+      label: g,
+      data: dates.map(d => gameMap[g][d] ?? 0),
       borderColor: colors[i % colors.length],
       backgroundColor: colors[i % colors.length] + '22',
-      tension: 0.3,
-      pointRadius: 3,
-      fill: false,
+      tension: 0.3, pointRadius: 3, fill: false,
     }));
+    const opts = {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: s.text } } },
+      scales: {
+        x: { ticks: { color: s.subtle }, grid: { color: s.border } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: s.subtle }, grid: { color: s.border } },
+      },
+    };
+    if (timelineChart) {
+      timelineChart.data.labels   = dates;
+      timelineChart.data.datasets = datasets;
+      timelineChart.options = opts;
+      timelineChart.update();
+    } else {
+      timelineChart = new Chart(canvas.getContext('2d'), { type: 'line', data: { labels: dates, datasets }, options: opts });
+    }
+  }
 
-    const chartOptions = {
-      responsive: true,
+  /* ── Difficulty chart ── */
+  let diffChart = null;
+
+  async function fetchDifficulty() {
+    let data;
+    try {
+      const res = await fetch('/admin/stats/difficulty');
+      data = await res.json();
+    } catch (e) { return; }
+
+    const canvas = document.getElementById('difficultyChart');
+    const empty  = document.getElementById('difficultyEmpty');
+    if (!data.length) {
+      canvas.style.display = 'none';
+      empty.style.display = 'block';
+      if (diffChart) { diffChart.destroy(); diffChart = null; }
+      return;
+    }
+    canvas.style.display = 'block';
+    empty.style.display = 'none';
+
+    const s = getStyle();
+    const labels = data.map(r => r.game);
+    const scores = data.map(r => r.avg_base_score);
+    const colors = getColors();
+
+    const opts = {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: s.text },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` Avg base score: ${ctx.parsed.x}  (${data[ctx.dataIndex].submission_count} submissions)`,
+          },
         },
       },
       scales: {
         x: {
-          title: { display: true, text: 'Date', color: s.subtle },
-          ticks: { color: s.subtle },
-          grid: { color: s.border },
+          min: 0, max: 100,
+          title: { display: true, text: 'Avg Base Score', color: s.subtle },
+          ticks: { color: s.subtle }, grid: { color: s.border },
         },
-        y: {
-          title: { display: true, text: 'Submissions', color: s.subtle },
-          beginAtZero: true,
-          ticks: { precision: 0, color: s.subtle },
-          grid: { color: s.border },
-        },
+        y: { ticks: { color: s.text }, grid: { color: s.border } },
       },
     };
-
-    if (chart) {
-      chart.data.labels = dates;
-      chart.data.datasets = datasets;
-      chart.options = chartOptions;
-      chart.update();
+    const dataset = {
+      data: scores,
+      backgroundColor: scores.map((v, i) => colors[i % colors.length] + 'cc'),
+      borderColor:     scores.map((v, i) => colors[i % colors.length]),
+      borderWidth: 2,
+    };
+    if (diffChart) {
+      diffChart.data.labels   = labels;
+      diffChart.data.datasets = [dataset];
+      diffChart.options = opts;
+      diffChart.update();
     } else {
-      const ctx = canvas.getContext('2d');
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: dates, datasets },
-        options: chartOptions,
-      });
+      diffChart = new Chart(canvas.getContext('2d'), { type: 'bar', data: { labels, datasets: [dataset] }, options: opts });
     }
   }
 
-  function applyThemeToChart() {
-    if (!chart) return;
-    const colors = getColors();
-    const s = getChartStyle();
-    chart.data.datasets.forEach((ds, i) => {
-      ds.borderColor = colors[i % colors.length];
-      ds.backgroundColor = colors[i % colors.length] + '22';
+  function applyTheme() {
+    [timelineChart, diffChart].forEach(chart => {
+      if (!chart) return;
+      const s = getStyle();
+      const colors = getColors();
+      chart.data.datasets.forEach((ds, i) => {
+        const c = colors[i % colors.length];
+        ds.borderColor = c;
+        ds.backgroundColor = c + (chart === diffChart ? 'cc' : '22');
+      });
+      chart.options.plugins.legend?.labels && (chart.options.plugins.legend.labels.color = s.text);
+      ['x','y'].forEach(axis => {
+        if (!chart.options.scales?.[axis]) return;
+        chart.options.scales[axis].ticks.color  = axis === 'y' && chart === diffChart ? s.text : s.subtle;
+        chart.options.scales[axis].grid.color   = s.border;
+        if (chart.options.scales[axis].title) chart.options.scales[axis].title.color = s.subtle;
+      });
+      chart.update();
     });
-    chart.options.plugins.legend.labels.color = s.text;
-    chart.options.scales.x.ticks.color = s.subtle;
-    chart.options.scales.x.grid.color = s.border;
-    chart.options.scales.x.title.color = s.subtle;
-    chart.options.scales.y.ticks.color = s.subtle;
-    chart.options.scales.y.grid.color = s.border;
-    chart.options.scales.y.title.color = s.subtle;
-    chart.update();
   }
 
   document.querySelectorAll('.day-btn').forEach(btn => {
-    btn.addEventListener('click', () => fetchAndRender(parseInt(btn.dataset.days)));
+    btn.addEventListener('click', () => fetchTimeline(parseInt(btn.dataset.days)));
   });
+  document.addEventListener('themechange', applyTheme);
 
-  document.addEventListener('themechange', applyThemeToChart);
-
-  fetchAndRender(30);
+  fetchTimeline(30);
+  fetchDifficulty();
 })();
 </script>
 {% endblock %}

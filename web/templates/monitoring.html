@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Monitoring — Score Bot Admin{% endblock %}
+{% block content %}
+<style>
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 0; }
+  .tab-btn {
+    padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+    border: none; background: none; color: var(--text-muted);
+    border-bottom: 3px solid transparent; margin-bottom: -2px;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
+</style>
+
+<h2 style="margin-bottom:16px;">Monitoring</h2>
+
+<div class="tab-bar">
+  <a href="/admin/monitoring?tab=logs" class="tab-btn {% if tab == 'logs' %}active{% endif %}">Logs</a>
+  <a href="/admin/monitoring?tab=usage" class="tab-btn {% if tab == 'usage' %}active{% endif %}">Usage</a>
+</div>
+
+{% if tab == 'logs' %}
+
+<div class="filters">
+  <form method="get" action="/admin/monitoring" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;width:100%">
+    <input type="hidden" name="tab" value="logs">
+    <div class="filter-group">
+      <label>Level</label>
+      <select name="level" class="input">
+        <option value="" {% if not log_filters.level %}selected{% endif %}>All</option>
+        <option value="INFO"    {% if log_filters.level == 'INFO'    %}selected{% endif %}>INFO</option>
+        <option value="WARNING" {% if log_filters.level == 'WARNING' %}selected{% endif %}>WARNING</option>
+        <option value="ERROR"   {% if log_filters.level == 'ERROR'   %}selected{% endif %}>ERROR</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Logger</label>
+      <input type="text" name="logger" value="{{ log_filters.logger }}" class="input" placeholder="e.g. bot.main" style="width:150px">
+    </div>
+    <div class="filter-group">
+      <label>Search</label>
+      <input type="text" name="search" value="{{ log_filters.search }}" class="input" placeholder="Search messages…" style="width:220px">
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="/admin/monitoring?tab=logs" class="btn btn-secondary">Clear</a>
+  </form>
+</div>
+
+<div style="margin-bottom:12px;color:var(--text-muted);font-size:13px;">
+  {{ total }} log entr{{ 'y' if total == 1 else 'ies' }}
+</div>
+
+{% if logs %}
+<table>
+  <thead>
+    <tr>
+      <th>Timestamp ({{ tz_label }})</th><th>Level</th><th>Logger</th><th>Message</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in logs %}
+    <tr>
+      <td style="white-space:nowrap;color:var(--text-muted);font-size:12px;font-family:monospace">{{ entry.timestamp_str }}</td>
+      <td>
+        {% if entry.level == 'ERROR' %}<span class="badge badge-error">ERROR</span>
+        {% elif entry.level == 'WARNING' %}<span class="badge badge-warning">WARN</span>
+        {% else %}<span class="badge badge-info">INFO</span>{% endif %}
+      </td>
+      <td style="font-family:monospace;font-size:12px;color:var(--text-muted);white-space:nowrap">{{ entry.logger }}</td>
+      <td style="font-size:13px;word-break:break-word">
+        {{ entry.message }}
+        {% if entry.exc_text %}
+        <details style="margin-top:6px">
+          <summary style="cursor:pointer;font-size:12px;color:var(--text-muted)">stack trace</summary>
+          <pre style="margin:6px 0 0;padding:10px;background:var(--bg-secondary,#1a1a1a);border-radius:4px;font-size:11px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">{{ entry.exc_text }}</pre>
+        </details>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if page > 1 %}<a href="{{ page_url(page - 1) }}">← Prev</a>{% endif %}
+  <span class="current">{{ page }}</span>
+  {% if has_next %}<a href="{{ page_url(page + 1) }}">Next →</a>{% endif %}
+</div>
+{% else %}
+<div class="empty">No log entries found.</div>
+{% endif %}
+
+{% else %}
+
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+  {% for event_type_name, count in usage_summary %}
+  <div class="stat-card">
+    <div class="stat-label">{{ event_type_name }}</div>
+    <div class="stat-value">{{ count }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="filters">
+  <form method="get" action="/admin/monitoring" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;width:100%">
+    <input type="hidden" name="tab" value="usage">
+    <div class="filter-group">
+      <label>Event Type</label>
+      <input type="text" name="event_type" value="{{ filter_event_type }}" class="input" placeholder="e.g. command.leaderboard" style="width:220px">
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="/admin/monitoring?tab=usage" class="btn btn-secondary">Clear</a>
+  </form>
+</div>
+
+<div style="margin-bottom:12px;color:var(--text-muted);font-size:13px;">
+  {{ total }} event{{ 's' if total != 1 else '' }}
+</div>
+
+{% if usage_events %}
+<table>
+  <thead>
+    <tr><th>Timestamp</th><th>Event</th><th>User</th><th>Metadata</th></tr>
+  </thead>
+  <tbody>
+    {% for event in usage_events %}
+    <tr>
+      <td style="white-space:nowrap;color:var(--text-muted);font-size:12px;font-family:monospace">{{ event.timestamp_str }}</td>
+      <td>
+        {% if event.event_type.startswith('feature.') %}
+          <span class="badge badge-warning">{{ event.event_type }}</span>
+        {% else %}
+          <span class="badge badge-info">{{ event.event_type }}</span>
+        {% endif %}
+      </td>
+      <td style="font-size:13px">{{ event.username }}</td>
+      <td style="font-family:monospace;font-size:12px;color:var(--text-muted)">{{ event.metadata }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if page > 1 %}<a href="{{ page_url(page - 1) }}">← Prev</a>{% endif %}
+  <span class="current">{{ page }}</span>
+  {% if has_next %}<a href="{{ page_url(page + 1) }}">Next →</a>{% endif %}
+</div>
+{% else %}
+<div class="empty">No usage events found.</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

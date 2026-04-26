@@ -56,7 +56,11 @@ def create_daily_poll(
     )
     session.add(poll)
     session.flush()
-    session.execute(update(GameSuggestion).where(GameSuggestion.id.in_(suggestion_ids)).values(poll_id=poll.id))
+    session.execute(
+        update(GameSuggestion)
+        .where(GameSuggestion.id.in_(suggestion_ids))
+        .values(poll_id=poll.id, status="polled")
+    )
     return poll
 
 

@@ -1,10 +1,21 @@
 import logging
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, select
 
-from bot.database import Game, Submission, recalculate_game_ranks
+from bot.database import (
+    Game,
+    Submission,
+    get_all_streaks,
+    get_avg_score_over_time,
+    get_game_difficulty_metrics,
+    get_game_raw_data_breakdown,
+    get_game_speed_bonus_stats,
+    get_leaderboard,
+    get_score_distribution,
+    recalculate_game_ranks,
+)
 from web.deps import _db_session, fetch_all_games, require_admin, templates
 
 log = logging.getLogger(__name__)
@@ -38,6 +49,68 @@ async def games_list(
             "flash": flash,
         },
     )
+
+
+@router.get("/games/{game_id}")
+async def game_detail(
+    request: Request,
+    game_id: str,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        game = db.get(Game, game_id)
+        if not game:
+            return RedirectResponse(url="/admin/games", status_code=302)
+        metrics = get_game_difficulty_metrics(db, game_id)
+        leaderboard = get_leaderboard(db, "alltime", game_id=game_id)
+        streaks = [(uid, uname, streak) for uid, uname, streak in get_all_streaks(db, game_id) if streak > 0][:10]
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request,
+        "game_detail.html",
+        {
+            "active": "games",
+            "game": game,
+            "metrics": metrics,
+            "leaderboard": leaderboard,
+            "streaks": streaks,
+        },
+    )
+
+
+@router.get("/games/{game_id}/stats")
+async def game_detail_stats(
+    game_id: str,
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        distribution = get_score_distribution(db, game_id)
+        score_over_time = get_avg_score_over_time(db, game_id, days=60)
+        breakdown = get_game_raw_data_breakdown(db, game_id)
+        speed_stats = get_game_speed_bonus_stats(db, game_id)
+    finally:
+        db.close()
+
+    return JSONResponse({
+        "distribution": [{"label": b.label, "count": b.count} for b in distribution],
+        "score_over_time": [
+            {"date": p.date, "avg": p.avg_base_score, "count": p.submission_count}
+            for p in score_over_time
+        ],
+        "breakdown": breakdown,
+        "speed": {
+            "total": speed_stats.total_submissions,
+            "bonus_count": speed_stats.speed_bonus_count,
+            "pct": speed_stats.speed_bonus_pct,
+            "rank1": speed_stats.rank1_count,
+            "rank2": speed_stats.rank2_count,
+            "rank3": speed_stats.rank3_count,
+        },
+    })
 
 
 @router.post("/games/{game_id}/recalculate")

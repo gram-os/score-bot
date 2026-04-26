@@ -18,7 +18,7 @@
     {% for g in games %}
     <tr>
       <td><code>{{ g.id }}</code></td>
-      <td>{{ g.name }}</td>
+      <td><a href="/admin/games/{{ g.id }}" class="text-link" style="text-decoration:none;">{{ g.name }}</a></td>
       <td>{{ counts.get(g.id, 0) }}</td>
       <td>
         {% if g.enabled %}

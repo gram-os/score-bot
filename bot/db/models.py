@@ -88,6 +88,7 @@ class GameSuggestion(Base):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     suggested_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     poll_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("daily_polls.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
 
     poll: Mapped["DailyPoll | None"] = relationship("DailyPoll", back_populates="suggestions")
 
