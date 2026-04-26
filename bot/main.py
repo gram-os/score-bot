@@ -7,7 +7,20 @@ from discord import app_commands
 from discord.ext import tasks
 from sqlalchemy.orm import sessionmaker
 
-from bot.commands import achievements, best, games, help, homunculus, leaderboard, mystats, profile, remind, suggest, vs
+from bot.commands import (
+    achievements,
+    best,
+    games,
+    help,
+    homunculus,
+    leaderboard,
+    mystats,
+    profile,
+    remind,
+    suggest,
+    submitted,
+    vs,
+)
 from bot.config import (
     ADMIN_DISCORD_IDS,
     DATABASE_PATH,
@@ -29,7 +42,20 @@ from bot.tasks import homunculus as homunculus_task
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-_COMMAND_MODULES = [leaderboard, games, suggest, vs, best, mystats, profile, achievements, remind, help, homunculus]
+_COMMAND_MODULES = [
+    leaderboard,
+    games,
+    suggest,
+    vs,
+    best,
+    mystats,
+    profile,
+    achievements,
+    remind,
+    help,
+    homunculus,
+    submitted,
+]
 
 
 class ScoreBot(discord.Client):

@@ -10,7 +10,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
         with Session() as session:
             enabled = session.query(Game).filter(Game.enabled.is_(True)).all()
             log_usage_event(session, "command.games", str(interaction.user.id), interaction.user.display_name)
-            lines = [f"**{g.name}** (`{g.id}`)" for g in enabled]
+            lines = [f"**[{g.name}]({g.url})** (`{g.id}`)" if g.url else f"**{g.name}** (`{g.id}`)" for g in enabled]
             session.commit()
 
         if not lines:

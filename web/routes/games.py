@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, select
 
@@ -134,6 +134,26 @@ async def game_recalculate(
     )
     request.session["flash"] = f"Recalculated scores across {affected} date(s) for {game_id}."
     return RedirectResponse(url="/admin/games", status_code=303)
+
+
+@router.post("/games/{game_id}/set-url")
+async def game_set_url(
+    request: Request,
+    game_id: str,
+    url: str = Form(default=""),
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        game = db.get(Game, game_id)
+        if game:
+            game.url = url.strip() or None
+            db.commit()
+            log.info("Admin %s set url for game %s to %s", session["username"], game_id, game.url)
+            request.session["flash"] = f"URL updated for {game.name}."
+    finally:
+        db.close()
+    return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
 
 
 @router.post("/games/{game_id}/toggle")
