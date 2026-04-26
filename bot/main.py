@@ -23,7 +23,7 @@ from bot.config import (
 from bot.database import get_engine
 from bot.log_handler import setup_db_logging
 from bot.parsers.registry import ParserRegistry
-from bot.tasks import digests, message_handler, polls, reminders
+from bot.tasks import digests, message_handler, polls, reminders, startup_backfill
 from bot.tasks import homunculus as homunculus_task
 
 logging.basicConfig(level=logging.INFO)
@@ -86,6 +86,8 @@ class ScoreBot(discord.Client):
             self._scheduler.start()
             log.info("Digest scheduler started (fires at %02d:%02d local)", DIGEST_HOUR, DIGEST_MINUTE)
             log.info("Reminder scheduler started (fires at %02d:%02d local)", REMINDER_HOUR, REMINDER_MINUTE)
+
+        await startup_backfill.run_startup_backfill(self, self.registry, self.Session, DISCORD_CHANNEL_ID)
 
     async def close(self) -> None:
         if self._scheduler.running:
