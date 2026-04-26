@@ -17,6 +17,9 @@ class TestQuordleParserCanParse:
     def test_detects_valid_header(self):
         assert self.parser.can_parse("Daily Quordle #123\n4️⃣5️⃣\n6️⃣7️⃣")
 
+    def test_detects_header_without_hash(self):
+        assert self.parser.can_parse("Daily Quordle 1553\n8️⃣5️⃣\n4️⃣7️⃣")
+
     def test_rejects_unrelated(self):
         assert not self.parser.can_parse("unrelated message")
 

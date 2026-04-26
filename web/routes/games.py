@@ -95,22 +95,23 @@ async def game_detail_stats(
     finally:
         db.close()
 
-    return JSONResponse({
-        "distribution": [{"label": b.label, "count": b.count} for b in distribution],
-        "score_over_time": [
-            {"date": p.date, "avg": p.avg_base_score, "count": p.submission_count}
-            for p in score_over_time
-        ],
-        "breakdown": breakdown,
-        "speed": {
-            "total": speed_stats.total_submissions,
-            "bonus_count": speed_stats.speed_bonus_count,
-            "pct": speed_stats.speed_bonus_pct,
-            "rank1": speed_stats.rank1_count,
-            "rank2": speed_stats.rank2_count,
-            "rank3": speed_stats.rank3_count,
-        },
-    })
+    return JSONResponse(
+        {
+            "distribution": [{"label": b.label, "count": b.count} for b in distribution],
+            "score_over_time": [
+                {"date": p.date, "avg": p.avg_base_score, "count": p.submission_count} for p in score_over_time
+            ],
+            "breakdown": breakdown,
+            "speed": {
+                "total": speed_stats.total_submissions,
+                "bonus_count": speed_stats.speed_bonus_count,
+                "pct": speed_stats.speed_bonus_pct,
+                "rank1": speed_stats.rank1_count,
+                "rank2": speed_stats.rank2_count,
+                "rank3": speed_stats.rank3_count,
+            },
+        }
+    )
 
 
 @router.post("/games/{game_id}/recalculate")
