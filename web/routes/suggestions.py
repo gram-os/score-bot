@@ -28,11 +28,7 @@ async def suggestions_view(
 ):
     db = _db_session()
     try:
-        rows = (
-            db.execute(select(GameSuggestion).order_by(GameSuggestion.suggested_at.desc()))
-            .scalars()
-            .all()
-        )
+        rows = db.execute(select(GameSuggestion).order_by(GameSuggestion.suggested_at.desc())).scalars().all()
         suggestions = [_serialize(s) for s in rows]
     finally:
         db.close()

@@ -78,5 +78,3 @@ async def live_feed(
     finally:
         db.close()
     return JSONResponse(submissions)
-
-

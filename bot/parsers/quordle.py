@@ -3,7 +3,7 @@ from datetime import datetime
 
 from .base import GameParser, ParseResult
 
-_HEADER_PATTERN = re.compile(r"Daily Quordle #(\d+)")
+_HEADER_PATTERN = re.compile(r"Daily Quordle #?(\d+)")
 
 # Emoji digit → attempt count; 🟥 = failed word, counts as 9
 _EMOJI_MAP = {

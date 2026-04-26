@@ -37,6 +37,7 @@ def get_display_tz(db: Session) -> ZoneInfo:
     except (ZoneInfoNotFoundError, KeyError):
         return ZoneInfo("America/New_York")
 
+
 log = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory="web/templates")
