@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, select
 
@@ -95,22 +95,23 @@ async def game_detail_stats(
     finally:
         db.close()
 
-    return JSONResponse({
-        "distribution": [{"label": b.label, "count": b.count} for b in distribution],
-        "score_over_time": [
-            {"date": p.date, "avg": p.avg_base_score, "count": p.submission_count}
-            for p in score_over_time
-        ],
-        "breakdown": breakdown,
-        "speed": {
-            "total": speed_stats.total_submissions,
-            "bonus_count": speed_stats.speed_bonus_count,
-            "pct": speed_stats.speed_bonus_pct,
-            "rank1": speed_stats.rank1_count,
-            "rank2": speed_stats.rank2_count,
-            "rank3": speed_stats.rank3_count,
-        },
-    })
+    return JSONResponse(
+        {
+            "distribution": [{"label": b.label, "count": b.count} for b in distribution],
+            "score_over_time": [
+                {"date": p.date, "avg": p.avg_base_score, "count": p.submission_count} for p in score_over_time
+            ],
+            "breakdown": breakdown,
+            "speed": {
+                "total": speed_stats.total_submissions,
+                "bonus_count": speed_stats.speed_bonus_count,
+                "pct": speed_stats.speed_bonus_pct,
+                "rank1": speed_stats.rank1_count,
+                "rank2": speed_stats.rank2_count,
+                "rank3": speed_stats.rank3_count,
+            },
+        }
+    )
 
 
 @router.post("/games/{game_id}/recalculate")
@@ -133,6 +134,26 @@ async def game_recalculate(
     )
     request.session["flash"] = f"Recalculated scores across {affected} date(s) for {game_id}."
     return RedirectResponse(url="/admin/games", status_code=303)
+
+
+@router.post("/games/{game_id}/set-url")
+async def game_set_url(
+    request: Request,
+    game_id: str,
+    url: str = Form(default=""),
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        game = db.get(Game, game_id)
+        if game:
+            game.url = url.strip() or None
+            db.commit()
+            log.info("Admin %s set url for game %s to %s", session["username"], game_id, game.url)
+            request.session["flash"] = f"URL updated for {game.name}."
+    finally:
+        db.close()
+    return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
 
 
 @router.post("/games/{game_id}/toggle")

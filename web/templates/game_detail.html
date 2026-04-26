@@ -5,7 +5,7 @@
   <a href="/admin/games" class="back-link">Games</a>
 </div>
 
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
   <h2 style="margin-bottom:0;">{{ game.name }}</h2>
   <span class="badge badge-{{ game.id }}">{{ game.id }}</span>
   {% if game.enabled %}
@@ -14,6 +14,12 @@
   <span class="badge" style="background:var(--c-disabled);color:#fff;">Disabled</span>
   {% endif %}
 </div>
+
+<form method="post" action="/admin/games/{{ game.id }}/set-url" style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+  <input type="url" name="url" value="{{ game.url or '' }}" placeholder="https://example.com/game"
+         style="flex:1;max-width:400px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:14px;">
+  <button type="submit" class="btn">Save URL</button>
+</form>
 
 {% if metrics %}
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
