@@ -2,9 +2,9 @@ from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from bot.database import Game, GameSuggestion, Submission
+from bot.database import Game, Submission
 from web.deps import _db_session, require_admin, templates
 
 router = APIRouter()
@@ -24,17 +24,6 @@ def _serialize_submission(s, game_name: str) -> dict:
     }
 
 
-def _serialize_suggestion(s) -> dict:
-    return {
-        "id": s.id,
-        "username": s.username,
-        "game_name": s.game_name,
-        "description": s.description or "",
-        "polled": s.poll_id is not None,
-        "suggested_at": s.suggested_at.strftime("%H:%M:%S") if s.suggested_at else "",
-    }
-
-
 def _fetch_today_submissions(db, today: date_type) -> tuple[list, int]:
     rows = db.execute(
         select(Submission)
@@ -47,20 +36,6 @@ def _fetch_today_submissions(db, today: date_type) -> tuple[list, int]:
     return [_serialize_submission(s, gn) for s, gn in rows], last_id
 
 
-def _fetch_today_suggestions(db, today: date_type) -> tuple[list, int]:
-    rows = (
-        db.execute(
-            select(GameSuggestion)
-            .where(func.date(GameSuggestion.suggested_at) == today)
-            .order_by(GameSuggestion.suggested_at.desc())
-        )
-        .scalars()
-        .all()
-    )
-    last_id = rows[0].id if rows else 0
-    return [_serialize_suggestion(s) for s in rows], last_id
-
-
 @router.get("/live")
 async def live_view(
     request: Request,
@@ -70,7 +45,6 @@ async def live_view(
     db = _db_session()
     try:
         submissions, last_sub_id = _fetch_today_submissions(db, today)
-        suggestions, last_sug_id = _fetch_today_suggestions(db, today)
     finally:
         db.close()
     return templates.TemplateResponse(
@@ -80,8 +54,6 @@ async def live_view(
             "active": "live",
             "submissions": submissions,
             "last_sub_id": last_sub_id,
-            "suggestions": suggestions,
-            "last_sug_id": last_sug_id,
             "today": today.isoformat(),
         },
     )
@@ -108,27 +80,3 @@ async def live_feed(
     return JSONResponse(submissions)
 
 
-@router.get("/live/suggestions")
-async def live_suggestions_feed(
-    after: int = 0,
-    session: dict = Depends(require_admin),
-):
-    today = date_type.today()
-    db = _db_session()
-    try:
-        rows = (
-            db.execute(
-                select(GameSuggestion)
-                .where(
-                    func.date(GameSuggestion.suggested_at) == today,
-                    GameSuggestion.id > after,
-                )
-                .order_by(GameSuggestion.suggested_at.desc())
-            )
-            .scalars()
-            .all()
-        )
-        suggestions = [_serialize_suggestion(s) for s in rows]
-    finally:
-        db.close()
-    return JSONResponse(suggestions)

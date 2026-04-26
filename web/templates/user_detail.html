@@ -20,6 +20,14 @@
     <div class="stat-label">Games</div>
     <div class="stat-value">{{ games_played | length }}</div>
   </div>
+  <div class="stat-card">
+    <div class="stat-label">Best Active Streak</div>
+    <div class="stat-value">{{ best_current_streak }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Best Ever Streak</div>
+    <div class="stat-value">{{ best_ever_streak }}</div>
+  </div>
 </div>
 
 <h3 style="margin-bottom:12px;">Achievements</h3>
@@ -38,7 +46,97 @@
   {% endfor %}
 </div>
 
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Score Over Time</div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+  <select id="gameFilter" class="input" style="width:auto;">
+    <option value="">All games</option>
+    {% for g in games_played %}
+    <option value="{{ g }}">{{ g }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="card" style="padding:16px;margin-bottom:24px;">
+  <div style="position:relative;height:240px;"><canvas id="scoreTimeChart"></canvas></div>
+  <p id="scoreTimeEmpty" style="display:none;text-align:center;color:var(--text-subtle);padding:32px 0;font-size:13px;">No submissions yet.</p>
+</div>
+
+<h3 style="margin-bottom:12px;">Per-Game Stats</h3>
+{% if per_game_stats %}
+<table style="margin-bottom:24px;">
+  <thead>
+    <tr>
+      <th>Game</th>
+      <th>Avg Score</th>
+      <th>Best Score</th>
+      <th>Submissions</th>
+      <th>Current Streak</th>
+      <th>Longest Streak</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in per_game_stats %}
+    <tr>
+      <td><a href="/admin/games/{{ row.game_id }}" class="text-link" style="text-decoration:none;"><span class="badge badge-{{ row.game_id }}">{{ row.game_id }}</span></a></td>
+      <td>{{ row.avg_score }}</td>
+      <td><strong>{{ row.best_score | int }}</strong></td>
+      <td>{{ row.submission_count }}</td>
+      <td>{% if row.current_streak > 0 %}🔥 {{ row.current_streak }}{% else %}—{% endif %}</td>
+      <td>{{ row.longest_streak }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty" style="margin-bottom:24px;">No game stats.</div>
+{% endif %}
+
+{% if h2h_users %}
+<h3 style="margin-bottom:12px;">Head-to-Head</h3>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+  <select id="h2hOpponent" class="input" style="width:auto;">
+    <option value="">Compare against...</option>
+    {% for u in h2h_users %}
+    <option value="{{ u.user_id }}">{{ u.username }}</option>
+    {% endfor %}
+  </select>
+  <select id="h2hGame" class="input" style="width:auto;">
+    <option value="">All games</option>
+    {% for g in games_played %}
+    <option value="{{ g }}">{{ g }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div id="h2hResult" style="display:none;margin-bottom:24px;">
+  <div class="card" style="padding:16px;">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:11px;color:var(--text-subtle);margin-bottom:4px;" id="h2hCallerName">—</div>
+        <div style="font-size:32px;font-weight:700;color:var(--c-primary);" id="h2hCallerWins">0</div>
+        <div style="font-size:10px;color:var(--text-muted);">WINS</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;" id="h2hCallerScore">0 pts</div>
+      </div>
+      <div style="text-align:center;color:var(--text-subtle);">
+        <div style="font-size:18px;font-weight:700;" id="h2hTies">0</div>
+        <div style="font-size:10px;">TIES</div>
+        <div style="font-size:10px;color:var(--text-subtle);margin-top:6px;" id="h2hDays">0 days</div>
+      </div>
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:11px;color:var(--text-subtle);margin-bottom:4px;" id="h2hOpponentName">—</div>
+        <div style="font-size:32px;font-weight:700;color:var(--c-primary);" id="h2hOpponentWins">0</div>
+        <div style="font-size:10px;color:var(--text-muted);">WINS</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;" id="h2hOpponentScore">0 pts</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="h2hError" style="display:none;margin-bottom:24px;" class="empty">No overlapping games found.</div>
+{% endif %}
+
+<h3 style="margin-bottom:12px;">Participation Heatmap</h3>
+<div id="heatmap" style="margin-bottom:24px;overflow-x:auto;"></div>
+
 {% if submissions %}
+<h3 style="margin-bottom:12px;">Submissions</h3>
 <table>
   <thead>
     <tr>
@@ -77,4 +175,230 @@
 {% else %}
 <div class="empty">No submissions found for this user.</div>
 {% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const USER_ID = {{ user_id | tojson }};
+  const SUBMISSION_DATES = {{ submission_dates | tojson }};
+  const COLORS_N  = ['#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2980b9'];
+  const COLORS_CB = ['#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7','#009E73','#F0E442','#AA3377'];
+
+  function getColors() {
+    return document.documentElement.getAttribute('data-cb') === 'deuteranopia' ? COLORS_CB : COLORS_N;
+  }
+  function getStyle() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      text:    s.getPropertyValue('--text').trim()        || '#222',
+      subtle:  s.getPropertyValue('--text-subtle').trim() || '#999',
+      border:  s.getPropertyValue('--border').trim()      || '#ddd',
+      primary: s.getPropertyValue('--c-primary').trim()   || '#e0457a',
+    };
+  }
+
+  /* ── Score Over Time chart ── */
+  let scoreChart = null;
+
+  async function fetchScoreHistory(gameId) {
+    const url = '/admin/users/' + USER_ID + '/score-history' + (gameId ? '?game_id=' + encodeURIComponent(gameId) : '');
+    let data;
+    try {
+      const res = await fetch(url);
+      data = await res.json();
+    } catch (e) { return; }
+
+    const canvas = document.getElementById('scoreTimeChart');
+    const empty  = document.getElementById('scoreTimeEmpty');
+    if (!data.length) {
+      canvas.style.display = 'none';
+      empty.style.display = 'block';
+      if (scoreChart) { scoreChart.destroy(); scoreChart = null; }
+      return;
+    }
+    canvas.style.display = 'block';
+    empty.style.display = 'none';
+
+    const s = getStyle();
+    const c = getColors();
+    let datasets;
+
+    if (gameId) {
+      datasets = [{
+        label: gameId,
+        data: data.map(p => ({ x: p.date, y: p.score })),
+        borderColor: c[0], backgroundColor: c[0] + '22',
+        tension: 0.3, pointRadius: 3, fill: false,
+      }];
+    } else {
+      const gameMap = {};
+      for (const p of data) {
+        if (!gameMap[p.game_id]) gameMap[p.game_id] = [];
+        gameMap[p.game_id].push({ x: p.date, y: p.score });
+      }
+      datasets = Object.entries(gameMap).map(([gid, pts], i) => ({
+        label: gid, data: pts,
+        borderColor: c[i % c.length], backgroundColor: c[i % c.length] + '22',
+        tension: 0.3, pointRadius: 3, fill: false,
+      }));
+    }
+
+    const opts = {
+      responsive: true, maintainAspectRatio: false,
+      parsing: false,
+      plugins: { legend: { position: 'bottom', labels: { color: s.text } } },
+      scales: {
+        x: { type: 'category', ticks: { color: s.subtle, maxTicksLimit: 12 }, grid: { color: s.border } },
+        y: { beginAtZero: true, ticks: { color: s.subtle }, grid: { color: s.border } },
+      },
+    };
+
+    if (scoreChart) {
+      scoreChart.data.datasets = datasets;
+      scoreChart.options = opts;
+      scoreChart.update();
+    } else {
+      scoreChart = new Chart(canvas.getContext('2d'), { type: 'line', data: { datasets }, options: opts });
+    }
+  }
+
+  document.getElementById('gameFilter')?.addEventListener('change', function () {
+    fetchScoreHistory(this.value);
+  });
+
+  /* ── Head-to-Head ── */
+  async function fetchH2H() {
+    const opponent = document.getElementById('h2hOpponent')?.value;
+    const gameId   = document.getElementById('h2hGame')?.value;
+    const resultEl = document.getElementById('h2hResult');
+    const errorEl  = document.getElementById('h2hError');
+    if (!opponent) { resultEl.style.display = 'none'; errorEl.style.display = 'none'; return; }
+
+    const url = '/admin/users/' + USER_ID + '/h2h?opponent=' + encodeURIComponent(opponent) + (gameId ? '&game_id=' + encodeURIComponent(gameId) : '');
+    let data;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) { resultEl.style.display = 'none'; errorEl.style.display = 'block'; return; }
+      data = await res.json();
+    } catch (e) { return; }
+
+    document.getElementById('h2hCallerName').textContent   = data.caller;
+    document.getElementById('h2hOpponentName').textContent = data.opponent;
+    document.getElementById('h2hCallerWins').textContent   = data.caller_wins;
+    document.getElementById('h2hOpponentWins').textContent = data.opponent_wins;
+    document.getElementById('h2hTies').textContent         = data.ties;
+    document.getElementById('h2hCallerScore').textContent  = Math.round(data.caller_total) + ' pts total';
+    document.getElementById('h2hOpponentScore').textContent = Math.round(data.opponent_total) + ' pts total';
+    document.getElementById('h2hDays').textContent         = data.days + ' shared days';
+    errorEl.style.display  = 'none';
+    resultEl.style.display = 'block';
+  }
+
+  document.getElementById('h2hOpponent')?.addEventListener('change', fetchH2H);
+  document.getElementById('h2hGame')?.addEventListener('change', fetchH2H);
+
+  /* ── Participation Heatmap ── */
+  function buildHeatmap() {
+    const container = document.getElementById('heatmap');
+    if (!container) return;
+
+    const dateSet = new Set(SUBMISSION_DATES);
+    const countMap = {};
+    for (const d of SUBMISSION_DATES) countMap[d] = (countMap[d] || 0) + 1;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const WEEKS = 53;
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - (WEEKS * 7 - 1));
+    startDate.setDate(startDate.getDate() - startDate.getDay());
+
+    const s = getStyle();
+    const primary = s.primary;
+
+    function hexAlpha(hex, alpha) {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+    function cellColor(count) {
+      if (!count) return s.border;
+      if (count === 1) return hexAlpha(primary, 0.25);
+      if (count === 2) return hexAlpha(primary, 0.50);
+      if (count === 3) return hexAlpha(primary, 0.75);
+      return primary;
+    }
+
+    const DAYS = ['S','M','T','W','T','F','S'];
+    const months = [];
+    let lastMonth = -1;
+
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-rows:repeat(8,14px);grid-template-columns:repeat(' + (WEEKS+1) + ',14px);gap:2px;width:max-content;';
+
+    for (let d = 0; d < 7; d++) {
+      const label = document.createElement('div');
+      label.style.cssText = 'font-size:9px;color:' + s.subtle + ';display:flex;align-items:center;justify-content:center;font-family:monospace;grid-row:' + (d+2) + ';grid-column:1;';
+      label.textContent = d % 2 === 1 ? DAYS[d] : '';
+      grid.appendChild(label);
+    }
+
+    for (let w = 0; w < WEEKS; w++) {
+      for (let d = 0; d < 7; d++) {
+        const cellDate = new Date(startDate);
+        cellDate.setDate(cellDate.getDate() + w * 7 + d);
+        if (cellDate > today) continue;
+
+        const iso = cellDate.toISOString().slice(0,10);
+        const count = countMap[iso] || 0;
+
+        const month = cellDate.getMonth();
+        if (month !== lastMonth) {
+          lastMonth = month;
+          months.push({ week: w, month });
+        }
+
+        const cell = document.createElement('div');
+        cell.style.cssText = 'width:12px;height:12px;background:' + cellColor(count) + ';border-radius:2px;grid-row:' + (d+2) + ';grid-column:' + (w+2) + ';';
+        cell.title = iso + (count ? ': ' + count + ' game' + (count > 1 ? 's' : '') : ': no submissions');
+        grid.appendChild(cell);
+      }
+    }
+
+    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    for (const { week, month } of months) {
+      const label = document.createElement('div');
+      label.style.cssText = 'font-size:9px;color:' + s.subtle + ';font-family:monospace;grid-row:1;grid-column:' + (week+2) + ';';
+      label.textContent = MONTH_NAMES[month];
+      grid.appendChild(label);
+    }
+
+    container.innerHTML = '';
+    container.appendChild(grid);
+  }
+
+  function applyTheme() {
+    if (scoreChart) {
+      const s = getStyle();
+      const c = getColors();
+      scoreChart.data.datasets.forEach((ds, i) => {
+        ds.borderColor     = c[i % c.length];
+        ds.backgroundColor = c[i % c.length] + '22';
+      });
+      scoreChart.options.plugins.legend.labels.color = s.text;
+      ['x','y'].forEach(axis => {
+        scoreChart.options.scales[axis].ticks.color = s.subtle;
+        scoreChart.options.scales[axis].grid.color  = s.border;
+      });
+      scoreChart.update();
+    }
+    buildHeatmap();
+  }
+
+  document.addEventListener('themechange', applyTheme);
+
+  fetchScoreHistory('');
+  buildHeatmap();
+})();
+</script>
 {% endblock %}

@@ -1,13 +1,16 @@
 import asyncio
+import logging
 import time
 from pathlib import Path
 
 import psutil
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 
-from web.deps import require_admin, templates
+from bot.database import get_config, set_config
+from web.deps import DISPLAY_TIMEZONES, _db_session, require_admin, templates
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -64,10 +67,39 @@ async def system_stats(session: dict = Depends(require_admin)):
 @router.get("/system")
 async def system_view(
     request: Request,
+    saved: str = "",
     session: dict = Depends(require_admin),
 ):
+    db = _db_session()
+    try:
+        display_timezone = get_config(db, "display_timezone", "America/New_York")
+    finally:
+        db.close()
     return templates.TemplateResponse(
         request,
         "system.html",
-        {"active": "system"},
+        {
+            "active": "system",
+            "display_timezone": display_timezone,
+            "timezones": DISPLAY_TIMEZONES,
+            "saved": bool(saved),
+        },
     )
+
+
+@router.post("/system/config")
+async def system_config_update(
+    request: Request,
+    display_timezone: str = Form(...),
+    session: dict = Depends(require_admin),
+):
+    valid_zones = {tz for tz, _ in DISPLAY_TIMEZONES}
+    if display_timezone not in valid_zones:
+        display_timezone = "America/New_York"
+    db = _db_session()
+    try:
+        set_config(db, "display_timezone", display_timezone)
+    finally:
+        db.close()
+    log.info("Admin %s updated config: display_timezone=%s", session["username"], display_timezone)
+    return RedirectResponse("/admin/system?saved=1", status_code=303)

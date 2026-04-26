@@ -1,8 +1,19 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
 from bot.achievements import ACHIEVEMENTS
-from bot.database import Submission, get_user_achievements, get_users_summary
+from bot.database import (
+    Submission,
+    get_head_to_head,
+    get_user_achievements,
+    get_user_best_streaks,
+    get_user_per_game_stats,
+    get_user_score_history,
+    get_user_submission_dates,
+    get_users_for_h2h,
+    get_users_summary,
+)
 from web.deps import _db_session, require_admin, templates
 
 router = APIRouter()
@@ -62,6 +73,10 @@ async def user_detail(
         total_score = sum(s.total_score for s in submissions)
         games_played = sorted({s.game_id for s in submissions})
         user_achievements = get_user_achievements(db, user_id)
+        best_current_streak, best_ever_streak = get_user_best_streaks(db, user_id)
+        per_game_stats = get_user_per_game_stats(db, user_id)
+        submission_dates = get_user_submission_dates(db, user_id)
+        h2h_users = get_users_for_h2h(db, exclude_user_id=user_id)
     finally:
         db.close()
 
@@ -77,5 +92,50 @@ async def user_detail(
             "total_score": total_score,
             "games_played": games_played,
             "achievements": achievements,
+            "best_current_streak": best_current_streak,
+            "best_ever_streak": best_ever_streak,
+            "per_game_stats": per_game_stats,
+            "submission_dates": submission_dates,
+            "h2h_users": h2h_users,
         },
     )
+
+
+@router.get("/users/{user_id}/score-history")
+async def user_score_history(
+    user_id: str,
+    game_id: str = Query(default=""),
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        points = get_user_score_history(db, user_id, game_id=game_id or None)
+    finally:
+        db.close()
+    return JSONResponse([{"date": p.date, "game_id": p.game_id, "score": p.total_score} for p in points])
+
+
+@router.get("/users/{user_id}/h2h")
+async def user_h2h(
+    user_id: str,
+    opponent: str = Query(...),
+    game_id: str = Query(default=""),
+    session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        result = get_head_to_head(db, user_id, opponent, game_id=game_id or None)
+    finally:
+        db.close()
+    if not result:
+        return JSONResponse({"error": "No overlapping games found."}, status_code=404)
+    return JSONResponse({
+        "caller": result.caller_username,
+        "opponent": result.opponent_username,
+        "caller_wins": result.caller_wins,
+        "opponent_wins": result.opponent_wins,
+        "ties": result.ties,
+        "caller_total": result.caller_total_score,
+        "opponent_total": result.opponent_total_score,
+        "days": result.overlapping_days,
+    })

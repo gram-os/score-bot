@@ -61,39 +61,9 @@
   </tbody>
 </table>
 
-<!-- Suggestions -->
-<div class="section-title">Suggestions</div>
-{% if suggestions %}
-<table id="sug-table">
-{% else %}
-<div class="empty" id="sug-empty">No suggestions yet today.</div>
-<table id="sug-table" style="display:none;">
-{% endif %}
-  <thead>
-    <tr>
-      <th>#</th><th>Time</th><th>Username</th><th>Game</th><th>Description</th><th>Status</th>
-    </tr>
-  </thead>
-  <tbody id="sug-body">
-    {% for s in suggestions %}
-    <tr data-id="{{ s.id }}">
-      <td class="text-subtle">{{ s.id }}</td>
-      <td class="text-muted">{{ s.suggested_at }}</td>
-      <td>{{ s.username }}</td>
-      <td>{{ s.game_name }}</td>
-      <td class="text-muted">{{ s.description }}</td>
-      <td><span class="badge {% if s.polled %}badge-polled{% else %}badge-pending{% endif %}">
-        {% if s.polled %}Polled{% else %}Pending{% endif %}
-      </span></td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
 <script>
 (function () {
   var lastSubId = {{ last_sub_id }};
-  var lastSugId = {{ last_sug_id }};
   var paused = false;
   var pulse = document.getElementById('pulse');
   var statusText = document.getElementById('status-text');
@@ -126,22 +96,6 @@
     return tr;
   }
 
-  function buildSugRow(s) {
-    var tr = document.createElement('tr');
-    tr.dataset.id = s.id;
-    tr.className = 'new-row';
-    var badgeCls = s.polled ? 'badge-polled' : 'badge-pending';
-    var badgeLabel = s.polled ? 'Polled' : 'Pending';
-    tr.innerHTML =
-      '<td class="text-subtle">' + s.id + '</td>' +
-      '<td class="text-muted">' + esc(s.suggested_at) + '</td>' +
-      '<td>' + esc(s.username) + '</td>' +
-      '<td>' + esc(s.game_name) + '</td>' +
-      '<td class="text-muted">' + esc(s.description) + '</td>' +
-      '<td><span class="badge ' + badgeCls + '">' + badgeLabel + '</span></td>';
-    return tr;
-  }
-
   function prepend(tbody, tableEl, emptyEl, row) {
     if (emptyEl) emptyEl.style.display = 'none';
     if (tableEl) tableEl.style.display = '';
@@ -163,28 +117,12 @@
       });
   }
 
-  function pollSugs() {
-    fetch('/admin/live/suggestions?after=' + lastSugId)
-      .then(function (r) { return r.json(); })
-      .then(function (rows) {
-        var tbody = document.getElementById('sug-body');
-        var table = document.getElementById('sug-table');
-        var empty = document.getElementById('sug-empty');
-        rows.forEach(function (s) {
-          if (s.id > lastSugId) lastSugId = s.id;
-          prepend(tbody, table, empty, buildSugRow(s));
-        });
-        return rows.length;
-      });
-  }
-
   function poll() {
     if (paused) return;
-    Promise.all([pollSubs(), pollSugs()])
-      .then(function (counts) {
-        var total = (counts[0] || 0) + (counts[1] || 0);
-        if (total > 0) {
-          statusText.textContent = total + ' new · ' + new Date().toLocaleTimeString();
+    pollSubs()
+      .then(function (count) {
+        if (count > 0) {
+          statusText.textContent = count + ' new · ' + new Date().toLocaleTimeString();
         }
       })
       .catch(function () {

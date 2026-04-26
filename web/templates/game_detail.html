@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}{{ game.name }} — Score Bot Admin{% endblock %}
+{% block content %}
+<div style="margin-bottom:16px;">
+  <a href="/admin/games" class="back-link">Games</a>
+</div>
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+  <h2 style="margin-bottom:0;">{{ game.name }}</h2>
+  <span class="badge badge-{{ game.id }}">{{ game.id }}</span>
+  {% if game.enabled %}
+  <span class="badge" style="background:var(--c-success);color:#fff;">Enabled</span>
+  {% else %}
+  <span class="badge" style="background:var(--c-disabled);color:#fff;">Disabled</span>
+  {% endif %}
+</div>
+
+{% if metrics %}
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
+  <div class="stat-card">
+    <div class="stat-label">Avg Base Score</div>
+    <div class="stat-value">{{ metrics.avg_base_score }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Std Dev</div>
+    <div class="stat-value">{{ metrics.stddev_base_score }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Fail Rate</div>
+    <div class="stat-value" style="color:{% if metrics.fail_rate > 0.15 %}var(--c-danger){% else %}var(--text){% endif %};">
+      {{ (metrics.fail_rate * 100) | round(1) }}%
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Perfect Rate</div>
+    <div class="stat-value" style="color:var(--c-success);">{{ (metrics.perfect_rate * 100) | round(1) }}%</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Median Score</div>
+    <div class="stat-value">{{ metrics.median_score }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Submissions</div>
+    <div class="stat-value" style="font-size:18px;">{{ metrics.total_submissions }}</div>
+  </div>
+</div>
+{% else %}
+<div class="empty" style="margin-bottom:24px;">No submissions yet for this game.</div>
+{% endif %}
+
+<div class="chart-grid" style="margin-bottom:24px;" id="chartGrid">
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Score Distribution</div>
+    <div class="card" style="padding:16px;">
+      <div style="position:relative;height:220px;"><canvas id="histChart"></canvas></div>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Avg Base Score Over Time</div>
+    <div class="card" style="padding:16px;">
+      <div style="position:relative;height:220px;"><canvas id="scoreTimeChart"></canvas></div>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Participation (Submissions / Day)</div>
+    <div class="card" style="padding:16px;">
+      <div style="position:relative;height:220px;"><canvas id="participationChart"></canvas></div>
+    </div>
+  </div>
+  <div id="rawDataSection" style="display:none;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;" id="rawDataLabel">Raw Data Breakdown</div>
+    <div class="card" style="padding:16px;">
+      <div style="position:relative;height:220px;"><canvas id="rawDataChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;" id="speedCards">
+  <div class="stat-card">
+    <div class="stat-label">Speed Bonus Rate</div>
+    <div class="stat-value" id="speedPct">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">1st Submitter</div>
+    <div class="stat-value" id="speedRank1">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">2nd Submitter</div>
+    <div class="stat-value" id="speedRank2">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">3rd Submitter</div>
+    <div class="stat-value" id="speedRank3">—</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;" class="chart-grid">
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Top Performers (All Time)</div>
+    {% if leaderboard %}
+    <table>
+      <thead>
+        <tr><th>Rank</th><th>Player</th><th>Score</th><th>Submissions</th></tr>
+      </thead>
+      <tbody>
+        {% for row in leaderboard %}
+        <tr>
+          <td class="rank-{{ row.rank }}">{{ row.rank }}</td>
+          <td><a href="/admin/users/{{ row.user_id }}" class="text-link" style="text-decoration:none;">{{ row.username }}</a></td>
+          <td><strong>{{ row.total_score | int }}</strong></td>
+          <td>{{ row.submission_count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No submissions yet.</div>
+    {% endif %}
+  </div>
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Active Streaks</div>
+    {% if streaks %}
+    <table>
+      <thead>
+        <tr><th>Rank</th><th>Player</th><th>Streak</th></tr>
+      </thead>
+      <tbody>
+        {% for uid, uname, streak in streaks %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="/admin/users/{{ uid }}" class="text-link" style="text-decoration:none;">{{ uname }}</a></td>
+          <td>🔥 {{ streak }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No active streaks.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const GAME_ID = {{ game.id | tojson }};
+  const COLORS_N  = ['#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2980b9'];
+  const COLORS_CB = ['#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7','#009E73','#F0E442','#AA3377'];
+
+  function getColors() {
+    return document.documentElement.getAttribute('data-cb') === 'deuteranopia' ? COLORS_CB : COLORS_N;
+  }
+  function getStyle() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      text:    s.getPropertyValue('--text').trim()        || '#222',
+      subtle:  s.getPropertyValue('--text-subtle').trim() || '#999',
+      border:  s.getPropertyValue('--border').trim()      || '#ddd',
+      primary: s.getPropertyValue('--c-primary').trim()   || '#e0457a',
+    };
+  }
+
+  const charts = {};
+
+  function makeOrUpdate(id, config) {
+    if (charts[id]) {
+      charts[id].data    = config.data;
+      charts[id].options = config.options;
+      charts[id].update();
+    } else {
+      charts[id] = new Chart(document.getElementById(id).getContext('2d'), config);
+    }
+  }
+
+  function buildCharts(data) {
+    const s = getStyle();
+    const c = getColors();
+
+    /* Distribution histogram */
+    const distLabels = data.distribution.map(b => b.label);
+    const distCounts = data.distribution.map(b => b.count);
+    makeOrUpdate('histChart', {
+      type: 'bar',
+      data: {
+        labels: distLabels,
+        datasets: [{ label: 'Submissions', data: distCounts, backgroundColor: c[0] + 'cc', borderColor: c[0], borderWidth: 2 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: s.subtle }, grid: { color: s.border } },
+          y: { beginAtZero: true, ticks: { precision: 0, color: s.subtle }, grid: { color: s.border } },
+        },
+      },
+    });
+
+    /* Avg score over time */
+    makeOrUpdate('scoreTimeChart', {
+      type: 'line',
+      data: {
+        labels: data.score_over_time.map(p => p.date),
+        datasets: [{
+          label: 'Avg Base Score', data: data.score_over_time.map(p => p.avg),
+          borderColor: c[1], backgroundColor: c[1] + '22', tension: 0.3, pointRadius: 3, fill: false,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: s.subtle }, grid: { color: s.border } },
+          y: { min: 0, max: 100, ticks: { color: s.subtle }, grid: { color: s.border } },
+        },
+      },
+    });
+
+    /* Participation trend */
+    makeOrUpdate('participationChart', {
+      type: 'bar',
+      data: {
+        labels: data.score_over_time.map(p => p.date),
+        datasets: [{
+          label: 'Submissions', data: data.score_over_time.map(p => p.count),
+          backgroundColor: c[2] + 'cc', borderColor: c[2], borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: s.subtle }, grid: { color: s.border } },
+          y: { beginAtZero: true, ticks: { precision: 0, color: s.subtle }, grid: { color: s.border } },
+        },
+      },
+    });
+
+    /* Raw data breakdown (game-specific) */
+    const bd = data.breakdown;
+    const bdKeys = Object.keys(bd);
+    if (bdKeys.length > 0) {
+      document.getElementById('rawDataSection').style.display = 'block';
+      const key = bdKeys[0];
+      const bdData = bd[key];
+      const bdLabels = Object.keys(bdData).map(String);
+      const bdCounts = bdLabels.map(l => bdData[l]);
+      const labelMap = {
+        attempts: 'Attempts', misses: 'Misses', hard_mode: 'Hard Mode',
+        total_guesses: 'Total Guesses', seconds_buckets: 'Time (seconds)', failed: 'Failed',
+      };
+      document.getElementById('rawDataLabel').textContent = labelMap[key] || key;
+
+      makeOrUpdate('rawDataChart', {
+        type: 'bar',
+        data: {
+          labels: bdLabels,
+          datasets: [{ data: bdCounts, backgroundColor: c[3] + 'cc', borderColor: c[3], borderWidth: 2 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: s.subtle }, grid: { color: s.border } },
+            y: { beginAtZero: true, ticks: { precision: 0, color: s.subtle }, grid: { color: s.border } },
+          },
+        },
+      });
+    }
+
+    /* Speed bonus stat cards */
+    const sp = data.speed;
+    document.getElementById('speedPct').textContent  = sp.total > 0 ? (sp.pct * 100).toFixed(1) + '%' : '—';
+    document.getElementById('speedRank1').textContent = sp.rank1 + ' days';
+    document.getElementById('speedRank2').textContent = sp.rank2 + ' days';
+    document.getElementById('speedRank3').textContent = sp.rank3 + ' days';
+  }
+
+  function applyTheme() {
+    Object.values(charts).forEach(chart => {
+      if (!chart) return;
+      const s = getStyle();
+      const c = getColors();
+      chart.data.datasets.forEach((ds, i) => {
+        ds.borderColor     = c[i % c.length];
+        ds.backgroundColor = c[i % c.length] + 'cc';
+      });
+      ['x','y'].forEach(axis => {
+        if (!chart.options.scales?.[axis]) return;
+        chart.options.scales[axis].ticks.color = s.subtle;
+        chart.options.scales[axis].grid.color  = s.border;
+      });
+      chart.update();
+    });
+  }
+
+  document.addEventListener('themechange', applyTheme);
+
+  fetch('/admin/games/' + GAME_ID + '/stats')
+    .then(r => r.json())
+    .then(buildCharts)
+    .catch(console.error);
+})();
+</script>
+{% endblock %}

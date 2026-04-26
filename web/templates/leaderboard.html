@@ -50,4 +50,132 @@
 {% else %}
 <div class="empty">No data for this period/game combination.</div>
 {% endif %}
+
+<div style="margin-top:32px;border-top:1px solid var(--border);padding-top:24px;">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:16px;">Submission Timeline</div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+    <button class="btn btn-secondary day-btn" data-days="7">7 days</button>
+    <button class="btn btn-secondary day-btn" data-days="30">30 days</button>
+    <button class="btn btn-secondary day-btn" data-days="90">90 days</button>
+  </div>
+  <div class="card" style="padding:16px;">
+    <div style="position:relative;height:260px;">
+      <canvas id="submissionsChart"></canvas>
+    </div>
+    <p id="emptyMsg" style="display:none;text-align:center;color:var(--text-subtle);padding:32px 0;font-size:13px;">No submissions in this period.</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const COLORS_NORMAL = ['#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2980b9','#c0392b','#1abc9c'];
+  const COLORS_CB    = ['#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7','#009E73','#F0E442','#AA3377','#CCBB44','#44BB99'];
+
+  function getColors() {
+    return document.documentElement.getAttribute('data-cb') === 'deuteranopia' ? COLORS_CB : COLORS_NORMAL;
+  }
+  function getChartStyle() {
+    var s = getComputedStyle(document.documentElement);
+    return {
+      text: s.getPropertyValue('--text').trim() || '#222',
+      subtle: s.getPropertyValue('--text-subtle').trim() || '#999',
+      border: s.getPropertyValue('--border').trim() || '#ddd',
+    };
+  }
+
+  let chart = null;
+  let activeDays = 30;
+
+  function setActiveBtn(days) {
+    document.querySelectorAll('.day-btn').forEach(btn => {
+      var active = parseInt(btn.dataset.days) === days;
+      btn.classList.toggle('btn-primary', active);
+      btn.classList.toggle('btn-secondary', !active);
+    });
+  }
+
+  async function fetchAndRender(days) {
+    activeDays = days;
+    setActiveBtn(days);
+    let data;
+    try {
+      const res = await fetch('/admin/stats/submissions?days=' + days);
+      data = await res.json();
+    } catch (e) { return; }
+
+    const emptyMsg = document.getElementById('emptyMsg');
+    const canvas   = document.getElementById('submissionsChart');
+    if (!data.length) {
+      canvas.style.display = 'none';
+      emptyMsg.style.display = 'block';
+      if (chart) { chart.destroy(); chart = null; }
+      return;
+    }
+    canvas.style.display = 'block';
+    emptyMsg.style.display = 'none';
+
+    const gameMap = {};
+    const dateSet = new Set();
+    for (const row of data) {
+      dateSet.add(row.date);
+      if (!gameMap[row.game]) gameMap[row.game] = {};
+      gameMap[row.game][row.date] = row.count;
+    }
+    const dates  = Array.from(dateSet).sort();
+    const games  = Object.keys(gameMap).sort();
+    const colors = getColors();
+    const s      = getChartStyle();
+
+    const datasets = games.map((game, i) => ({
+      label: game,
+      data: dates.map(d => gameMap[game][d] ?? 0),
+      borderColor: colors[i % colors.length],
+      backgroundColor: colors[i % colors.length] + '22',
+      tension: 0.3, pointRadius: 3, fill: false,
+    }));
+
+    const opts = {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: s.text } } },
+      scales: {
+        x: { title: { display: true, text: 'Date', color: s.subtle }, ticks: { color: s.subtle }, grid: { color: s.border } },
+        y: { title: { display: true, text: 'Submissions', color: s.subtle }, beginAtZero: true, ticks: { precision: 0, color: s.subtle }, grid: { color: s.border } },
+      },
+    };
+
+    if (chart) {
+      chart.data.labels   = dates;
+      chart.data.datasets = datasets;
+      chart.options = opts;
+      chart.update();
+    } else {
+      chart = new Chart(document.getElementById('submissionsChart').getContext('2d'), { type: 'line', data: { labels: dates, datasets }, options: opts });
+    }
+  }
+
+  function applyTheme() {
+    if (!chart) return;
+    const colors = getColors();
+    const s = getChartStyle();
+    chart.data.datasets.forEach((ds, i) => {
+      ds.borderColor = colors[i % colors.length];
+      ds.backgroundColor = colors[i % colors.length] + '22';
+    });
+    chart.options.plugins.legend.labels.color = s.text;
+    ['x','y'].forEach(axis => {
+      chart.options.scales[axis].ticks.color = s.subtle;
+      chart.options.scales[axis].grid.color  = s.border;
+      chart.options.scales[axis].title.color = s.subtle;
+    });
+    chart.update();
+  }
+
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => fetchAndRender(parseInt(btn.dataset.days)));
+  });
+  document.addEventListener('themechange', applyTheme);
+  fetchAndRender(30);
+})();
+</script>
 {% endblock %}
