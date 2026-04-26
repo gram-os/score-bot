@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from bot.commands import (
     achievements,
     best,
+    feedback,
     games,
     help,
     homunculus,
@@ -46,6 +47,7 @@ _COMMAND_MODULES = [
     leaderboard,
     games,
     suggest,
+    feedback,
     vs,
     best,
     mystats,
