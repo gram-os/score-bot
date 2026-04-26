@@ -16,6 +16,7 @@ def _today() -> date:
 # Stats dashboard
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class KpiToday:
     total_submissions: int
@@ -28,13 +29,11 @@ def get_kpi_today(session: Session) -> KpiToday:
     today = _today()
     week_start = today - timedelta(days=today.weekday())
 
-    total_submissions = session.scalar(
-        select(func.count(Submission.id)).where(Submission.date == today)
-    ) or 0
+    total_submissions = session.scalar(select(func.count(Submission.id)).where(Submission.date == today)) or 0
 
-    active_players = session.scalar(
-        select(func.count(distinct(Submission.user_id))).where(Submission.date == today)
-    ) or 0
+    active_players = (
+        session.scalar(select(func.count(distinct(Submission.user_id))).where(Submission.date == today)) or 0
+    )
 
     popular_row = session.execute(
         select(Game.name, func.count(Submission.id).label("cnt"))
@@ -47,20 +46,13 @@ def get_kpi_today(session: Session) -> KpiToday:
     most_popular_game = popular_row.name if popular_row else None
 
     all_enabled = {
-        row.id: row.name
-        for row in session.execute(
-            select(Game.id, Game.name).where(Game.enabled.is_(True))
-        ).all()
+        row.id: row.name for row in session.execute(select(Game.id, Game.name).where(Game.enabled.is_(True))).all()
     }
     submitted_today = {
         row.game_id
-        for row in session.execute(
-            select(Submission.game_id).where(Submission.date == today).distinct()
-        ).all()
+        for row in session.execute(select(Submission.game_id).where(Submission.date == today).distinct()).all()
     }
-    games_with_zero = [
-        name for gid, name in sorted(all_enabled.items()) if gid not in submitted_today
-    ]
+    games_with_zero = [name for gid, name in sorted(all_enabled.items()) if gid not in submitted_today]
 
     return KpiToday(
         total_submissions=total_submissions,
@@ -134,6 +126,7 @@ def get_speed_bonus_leaders(session: Session, limit: int = 5) -> list[SpeedBonus
 # Game detail
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GameDifficultyMetrics:
     avg_base_score: float
@@ -147,9 +140,7 @@ class GameDifficultyMetrics:
 def get_game_difficulty_metrics(session: Session, game_id: str) -> GameDifficultyMetrics | None:
     scores = [
         row.base_score
-        for row in session.execute(
-            select(Submission.base_score).where(Submission.game_id == game_id)
-        ).all()
+        for row in session.execute(select(Submission.base_score).where(Submission.game_id == game_id)).all()
     ]
     if not scores:
         return None
@@ -178,9 +169,7 @@ class ScoreBucket:
 def get_score_distribution(session: Session, game_id: str) -> list[ScoreBucket]:
     scores = [
         row.base_score
-        for row in session.execute(
-            select(Submission.base_score).where(Submission.game_id == game_id)
-        ).all()
+        for row in session.execute(select(Submission.base_score).where(Submission.game_id == game_id)).all()
     ]
     buckets = [
         ("0–20", 0),
@@ -239,9 +228,7 @@ def get_avg_score_over_time(session: Session, game_id: str, days: int = 60) -> l
 def get_game_raw_data_breakdown(session: Session, game_id: str) -> dict:
     raw_datas = [
         row.raw_data
-        for row in session.execute(
-            select(Submission.raw_data).where(Submission.game_id == game_id)
-        ).all()
+        for row in session.execute(select(Submission.raw_data).where(Submission.game_id == game_id)).all()
         if row.raw_data
     ]
     if not raw_datas:
@@ -362,6 +349,7 @@ def get_game_speed_bonus_stats(session: Session, game_id: str) -> GameSpeedBonus
 # User profile
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class UserScorePoint:
     date: str
@@ -369,9 +357,7 @@ class UserScorePoint:
     total_score: float
 
 
-def get_user_score_history(
-    session: Session, user_id: str, game_id: str | None = None
-) -> list[UserScorePoint]:
+def get_user_score_history(session: Session, user_id: str, game_id: str | None = None) -> list[UserScorePoint]:
     stmt = (
         select(Submission.date, Submission.game_id, Submission.total_score)
         .where(Submission.user_id == user_id)
@@ -380,18 +366,12 @@ def get_user_score_history(
     if game_id is not None:
         stmt = stmt.where(Submission.game_id == game_id)
     rows = session.execute(stmt).all()
-    return [
-        UserScorePoint(date=str(row.date), game_id=row.game_id, total_score=row.total_score)
-        for row in rows
-    ]
+    return [UserScorePoint(date=str(row.date), game_id=row.game_id, total_score=row.total_score) for row in rows]
 
 
 def get_user_submission_dates(session: Session, user_id: str) -> list[str]:
     rows = session.execute(
-        select(Submission.date)
-        .where(Submission.user_id == user_id)
-        .distinct()
-        .order_by(Submission.date.asc())
+        select(Submission.date).where(Submission.user_id == user_id).distinct().order_by(Submission.date.asc())
     ).all()
     return [str(row.date) for row in rows]
 
@@ -419,9 +399,7 @@ def get_user_per_game_stats(session: Session, user_id: str) -> list[UserGameRow]
         .order_by(Submission.game_id.asc())
     ).all()
 
-    streak_rows = session.execute(
-        select(UserStreak).where(UserStreak.user_id == user_id)
-    ).scalars().all()
+    streak_rows = session.execute(select(UserStreak).where(UserStreak.user_id == user_id)).scalars().all()
 
     today = _today()
     streak_map = {

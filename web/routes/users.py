@@ -129,13 +129,15 @@ async def user_h2h(
         db.close()
     if not result:
         return JSONResponse({"error": "No overlapping games found."}, status_code=404)
-    return JSONResponse({
-        "caller": result.caller_username,
-        "opponent": result.opponent_username,
-        "caller_wins": result.caller_wins,
-        "opponent_wins": result.opponent_wins,
-        "ties": result.ties,
-        "caller_total": result.caller_total_score,
-        "opponent_total": result.opponent_total_score,
-        "days": result.overlapping_days,
-    })
+    return JSONResponse(
+        {
+            "caller": result.caller_username,
+            "opponent": result.opponent_username,
+            "caller_wins": result.caller_wins,
+            "opponent_wins": result.opponent_wins,
+            "ties": result.ties,
+            "caller_total": result.caller_total_score,
+            "opponent_total": result.opponent_total_score,
+            "days": result.overlapping_days,
+        }
+    )
