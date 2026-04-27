@@ -4,7 +4,7 @@ from datetime import datetime
 
 from .base import GameParser, ParseResult
 
-_PATTERN = re.compile(r"TimeGuessr #(\d+) ([\d,]+)/50,000")
+_PATTERN = re.compile(r"TimeGuessr #(\d+)(?:\s+—)?\s+([\d,]+)/50,000")
 
 
 class TimeGuessrParser(GameParser):
