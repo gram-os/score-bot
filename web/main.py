@@ -44,3 +44,8 @@ async def not_authenticated_handler(request: Request, exc: NotAuthenticated):
 @app.get("/")
 async def root():
     return RedirectResponse(url="/admin", status_code=302)
+
+
+@app.get("/debug/headers")
+async def debug_headers(request: Request):
+    return dict(request.headers)
