@@ -183,7 +183,7 @@ async def submission_new_submit(
         db.close()
     log.info(
         "Admin %s added submission: user=%s game=%s date=%s score=%s",
-        session["username"],
+        session["email"],
         username,
         game_id,
         date,
@@ -205,6 +205,6 @@ async def submission_delete(
         db.commit()
     finally:
         db.close()
-    log.info("Admin %s deleted submission #%d", session["username"], submission_id)
+    log.info("Admin %s deleted submission #%d", session["email"], submission_id)
     request.session["flash"] = f"Submission #{submission_id} deleted."
     return RedirectResponse(url="/admin/submissions", status_code=303)

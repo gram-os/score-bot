@@ -101,5 +101,5 @@ async def system_config_update(
         set_config(db, "display_timezone", display_timezone)
     finally:
         db.close()
-    log.info("Admin %s updated config: display_timezone=%s", session["username"], display_timezone)
+    log.info("Admin %s updated config: display_timezone=%s", session["email"], display_timezone)
     return RedirectResponse("/admin/system?saved=1", status_code=303)

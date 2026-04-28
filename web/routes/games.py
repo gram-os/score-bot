@@ -128,7 +128,7 @@ async def game_recalculate(
         db.close()
     log.info(
         "Admin %s recalculated ranks for %s (%d date(s))",
-        session["username"],
+        session["email"],
         game_id,
         affected,
     )
@@ -149,7 +149,7 @@ async def game_set_url(
         if game:
             game.url = url.strip() or None
             db.commit()
-            log.info("Admin %s set url for game %s to %s", session["username"], game_id, game.url)
+            log.info("Admin %s set url for game %s to %s", session["email"], game_id, game.url)
             request.session["flash"] = f"URL updated for {game.name}."
     finally:
         db.close()
@@ -169,7 +169,7 @@ async def game_toggle(
             game.enabled = not game.enabled
             db.commit()
             state = "enabled" if game.enabled else "disabled"
-            log.info("Admin %s %s game %s", session["username"], state, game_id)
+            log.info("Admin %s %s game %s", session["email"], state, game_id)
             request.session["flash"] = f"{game.name} {state}."
     finally:
         db.close()
