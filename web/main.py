@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -35,7 +35,10 @@ app.include_router(admin_router)
 
 @app.exception_handler(NotAuthenticated)
 async def not_authenticated_handler(request: Request, exc: NotAuthenticated):
-    return RedirectResponse(url="/auth/login", status_code=302)
+    return HTMLResponse(
+        content="<h1>401 Unauthorized</h1><p>Access denied. Authenticate via Cloudflare Access and try again.</p>",
+        status_code=401,
+    )
 
 
 @app.get("/")

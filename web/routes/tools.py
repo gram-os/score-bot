@@ -99,7 +99,7 @@ async def tools_bulk_delete(
         db.close()
     log.info(
         "Admin %s bulk-deleted %d submission(s) for %s on %s",
-        session["username"],
+        session["email"],
         count,
         game_id,
         date,
@@ -172,7 +172,7 @@ async def tools_backfill(
 
     log.info(
         "Admin %s backfilled %s–%s: %d recorded, %d duplicates, %d errors",
-        admin_session["username"],
+        admin_session["email"],
         start_date,
         end_date,
         len(backfill_result.recorded),

@@ -64,7 +64,9 @@ Each game has a parser in `bot/parsers/` that extends `GameParser` (ABC in `base
 
 ### Auth
 
-Admin access is controlled purely by `ADMIN_DISCORD_IDS` env var (comma-separated Discord user IDs). There is no role table. Session cookie is signed with `SECRET_KEY`.
+Authentication is handled by Cloudflare Access (email OTP) at the edge. Every request to the admin panel must carry a valid `Cf-Access-Jwt-Assertion` header; `web/deps.py` verifies it via RS256 against the team's JWKS endpoint before any route handler runs.
+
+Admin access is controlled by `ADMIN_EMAILS` and `HOMUNCULUS_VIEWER_EMAILS` env vars (comma-separated emails). There is no role table. Session cookie (signed with `SECRET_KEY`) stores the `role` and `email` for template rendering and audit logs after a successful JWT check.
 
 ## Git Environment Notes
 - This repo may not have `origin/HEAD` set. When diffing against the default branch, use `origin/main` explicitly rather than `origin/HEAD`.
