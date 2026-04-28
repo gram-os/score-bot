@@ -18,7 +18,7 @@ def assign_submission_rank(session: Session, game_id: str, submission_date: date
     ).all()
 
     for rank, submission in enumerate(submissions, start=1):
-        bonus = calculate_speed_bonus(rank)
+        bonus = calculate_speed_bonus(rank) if submission.base_score > 0 else 0
         submission.submission_rank = rank
         submission.speed_bonus = bonus
         submission.total_score = submission.base_score + bonus

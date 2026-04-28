@@ -5,10 +5,10 @@ from bot.parsers.quordle import QuordleParser
 USER_ID = "123456789"
 TIMESTAMP = datetime(2024, 1, 15, 12, 0, 0)
 
-QUORDLE_LOW = "Daily Quordle #100\n2️⃣1️⃣\n1️⃣2️⃣"  # total=6 → score=80
-QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"  # total=35 → clamped to 0
-QUORDLE_FAIL = "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"  # 9+2+3+4=18 → score=0 (clamped); failed=True
-QUORDLE_MID = "Daily Quordle #400\n4️⃣5️⃣\n6️⃣7️⃣"  # total=22 → max(0,100-180)=0
+QUORDLE_LOW = "Daily Quordle #100\n2️⃣1️⃣\n1️⃣2️⃣"  # total=6, avg=1.5 → min(100, (9-1.5)/5*100)=100
+QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"  # failed → 0
+QUORDLE_FAIL = "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"  # failed → 0
+QUORDLE_MID = "Daily Quordle #400\n4️⃣5️⃣\n6️⃣7️⃣"  # total=22, avg=5.5 → (9-5.5)/5*100=70
 
 
 class TestQuordleParserCanParse:
@@ -31,10 +31,10 @@ class TestQuordleParserParse:
     parser = QuordleParser()
 
     def test_low_attempts_high_score(self):
-        # total=6 → max(0, 100 - (6-4)*10) = 80
+        # total=6, avg=1.5 → capped at 100
         result = self.parser.parse(QUORDLE_LOW, USER_ID, TIMESTAMP)
         assert result is not None
-        assert result.base_score == 80.0
+        assert result.base_score == 100.0
         assert result.raw_data["attempts"] == [2, 1, 1, 2]
         assert result.raw_data["total_attempts"] == 6
         assert result.raw_data["failed"] is False
@@ -52,6 +52,12 @@ class TestQuordleParserParse:
         assert result.raw_data["attempts"][0] == 9
         assert result.raw_data["failed"] is True
         assert result.base_score == 0.0
+
+    def test_mid_attempts_score(self):
+        # total=22, avg=5.5 → (9-5.5)/5*100 = 70
+        result = self.parser.parse(QUORDLE_MID, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 70.0
 
     def test_puzzle_number_extracted(self):
         result = self.parser.parse(QUORDLE_MID, USER_ID, TIMESTAMP)
