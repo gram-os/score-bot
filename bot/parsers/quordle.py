@@ -5,7 +5,6 @@ from .base import GameParser, ParseResult
 
 _HEADER_PATTERN = re.compile(r"Daily Quordle #?(\d+)")
 
-# Emoji digit → attempt count; 🟥 = failed word, counts as 9
 _EMOJI_MAP = {
     "1️⃣": 1,
     "2️⃣": 2,
@@ -51,7 +50,7 @@ class QuordleParser(GameParser):
 
         attempts = [_EMOJI_MAP[e] for e in emojis]
         total_attempts = sum(attempts)
-        failed = 9 in attempts
+        failed = "🟥" in emojis
 
         if failed:
             base_score = 0.0

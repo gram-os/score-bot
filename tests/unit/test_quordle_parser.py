@@ -6,7 +6,7 @@ USER_ID = "123456789"
 TIMESTAMP = datetime(2024, 1, 15, 12, 0, 0)
 
 QUORDLE_LOW = "Daily Quordle #100\n2️⃣1️⃣\n1️⃣2️⃣"  # total=6, avg=1.5 → min(100, (9-1.5)/5*100)=100
-QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"  # failed → 0
+QUORDLE_HIGH = "Daily Quordle #200\n8️⃣9️⃣\n9️⃣9️⃣"  # total=35, avg=8.75, no 🟥 → (9-8.75)/5*100=5.0
 QUORDLE_FAIL = "Daily Quordle #300\n🟥2️⃣\n3️⃣4️⃣"  # failed → 0
 QUORDLE_MID = "Daily Quordle #400\n4️⃣5️⃣\n6️⃣7️⃣"  # total=22, avg=5.5 → (9-5.5)/5*100=70
 
@@ -39,14 +39,15 @@ class TestQuordleParserParse:
         assert result.raw_data["total_attempts"] == 6
         assert result.raw_data["failed"] is False
 
-    def test_high_attempts_clamped_to_zero(self):
-        # total=35 → clamped to 0
+    def test_nine_guesses_not_treated_as_failure(self):
+        # 9️⃣ = solved on guess 9, not a failure — only 🟥 is a failure
         result = self.parser.parse(QUORDLE_HIGH, USER_ID, TIMESTAMP)
         assert result is not None
-        assert result.base_score == 0.0
+        assert result.raw_data["failed"] is False
+        assert result.base_score == 5.0
 
-    def test_failed_word_counts_as_nine(self):
-        # 🟥 → 9; total=9+2+3+4=18 → max(0,100-140)=0; failed=True
+    def test_failed_word_scores_zero(self):
+        # 🟥 is the only failure indicator; failed=True forces base_score=0
         result = self.parser.parse(QUORDLE_FAIL, USER_ID, TIMESTAMP)
         assert result is not None
         assert result.raw_data["attempts"][0] == 9
