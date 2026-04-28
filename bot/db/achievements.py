@@ -14,12 +14,13 @@ def get_user_achievements(session: Session, user_id: str) -> list[UserAchievemen
     )
 
 
-def award_season_champion(session: Session, user_id: str) -> bool:
-    """Award season_champion achievement. Returns True if newly awarded."""
+def award_season_champion(session: Session, user_id: str, season_id: int) -> bool:
+    """Award a season-scoped champion achievement. Returns True if newly awarded."""
+    slug = f"season_champion_{season_id}"
     existing = session.scalar(
         select(UserAchievement).where(
             UserAchievement.user_id == user_id,
-            UserAchievement.achievement_slug == "season_champion",
+            UserAchievement.achievement_slug == slug,
         )
     )
     if existing:
@@ -27,7 +28,8 @@ def award_season_champion(session: Session, user_id: str) -> bool:
     session.add(
         UserAchievement(
             user_id=user_id,
-            achievement_slug="season_champion",
+            achievement_slug=slug,
+            display_name="Season Champion",
             earned_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
     )

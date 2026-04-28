@@ -384,6 +384,7 @@ class UserGameRow:
     submission_count: int
     current_streak: int
     longest_streak: int
+    freeze_count: int
 
 
 def get_user_per_game_stats(session: Session, user_id: str) -> list[UserGameRow]:
@@ -406,6 +407,7 @@ def get_user_per_game_stats(session: Session, user_id: str) -> list[UserGameRow]
         r.game_id: (
             r.current_streak if r.last_submission_date and (today - r.last_submission_date).days <= 1 else 0,
             r.longest_streak,
+            r.freeze_count,
         )
         for r in streak_rows
     }
@@ -416,8 +418,9 @@ def get_user_per_game_stats(session: Session, user_id: str) -> list[UserGameRow]
             avg_score=round(row.avg_score, 1),
             best_score=row.best_score,
             submission_count=row.cnt,
-            current_streak=streak_map.get(row.game_id, (0, 0))[0],
-            longest_streak=streak_map.get(row.game_id, (0, 0))[1],
+            current_streak=streak_map.get(row.game_id, (0, 0, 0))[0],
+            longest_streak=streak_map.get(row.game_id, (0, 0, 0))[1],
+            freeze_count=streak_map.get(row.game_id, (0, 0, 0))[2],
         )
         for row in score_rows
     ]

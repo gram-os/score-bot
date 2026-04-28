@@ -123,6 +123,7 @@ class UserAchievement(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     achievement_slug: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     earned_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 

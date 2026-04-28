@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from sqlalchemy import select
 
-from bot.achievements import ACHIEVEMENTS
+from bot.achievements import resolve_achievement_def
 from bot.database import (
     Game,
     get_current_season,
@@ -54,7 +54,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
                 )
 
             user_achievements = get_user_achievements(session, user_id)
-            earned_ach_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
+            earned_ach_count = sum(1 for ua in user_achievements if resolve_achievement_def(ua.achievement_slug))
             badges = format_badges(user_achievements, separator=" · ")
             log_usage_event(session, "command.mystats", user_id, interaction.user.display_name)
             session.commit()

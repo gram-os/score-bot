@@ -28,6 +28,10 @@
     <div class="stat-label">Best Ever Streak</div>
     <div class="stat-value">{{ best_ever_streak }}</div>
   </div>
+  <div class="stat-card">
+    <div class="stat-label">Streak Freezes</div>
+    <div class="stat-value">🧊 {{ total_freezes }}</div>
+  </div>
 </div>
 
 <h3 style="margin-bottom:12px;">Achievements</h3>
@@ -71,6 +75,7 @@
       <th>Submissions</th>
       <th>Current Streak</th>
       <th>Longest Streak</th>
+      <th>Freezes</th>
     </tr>
   </thead>
   <tbody>
@@ -82,6 +87,7 @@
       <td>{{ row.submission_count }}</td>
       <td>{% if row.current_streak > 0 %}🔥 {{ row.current_streak }}{% else %}—{% endif %}</td>
       <td>{{ row.longest_streak }}</td>
+      <td>{% if row.freeze_count > 0 %}🧊 {{ row.freeze_count }}{% else %}—{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>

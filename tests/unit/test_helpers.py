@@ -29,13 +29,13 @@ def _make_user_achievement(slug: str):
 
 class TestFormatBadges:
     def test_no_achievements_returns_fallback(self, monkeypatch):
-        monkeypatch.setattr("bot.helpers.ACHIEVEMENTS", {})
+        monkeypatch.setattr("bot.achievements.ACHIEVEMENTS", {})
         result = format_badges([])
         assert result == "None yet — keep playing!"
 
     def test_earned_achievements_formatted(self, monkeypatch):
         monkeypatch.setattr(
-            "bot.helpers.ACHIEVEMENTS",
+            "bot.achievements.ACHIEVEMENTS",
             {"streak_3": _make_achievement("streak_3", "🔥", "On Fire")},
         )
         ua = _make_user_achievement("streak_3")
@@ -43,14 +43,14 @@ class TestFormatBadges:
         assert result == "🔥 On Fire"
 
     def test_unknown_slug_skipped(self, monkeypatch):
-        monkeypatch.setattr("bot.helpers.ACHIEVEMENTS", {})
+        monkeypatch.setattr("bot.achievements.ACHIEVEMENTS", {})
         ua = _make_user_achievement("nonexistent")
         result = format_badges([ua])
         assert result == "None yet — keep playing!"
 
     def test_custom_separator(self, monkeypatch):
         monkeypatch.setattr(
-            "bot.helpers.ACHIEVEMENTS",
+            "bot.achievements.ACHIEVEMENTS",
             {
                 "a": _make_achievement("a", "🎯", "A"),
                 "b": _make_achievement("b", "🏆", "B"),

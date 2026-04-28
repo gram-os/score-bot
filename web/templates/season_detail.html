@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}{{ season.name }} — Score Bot Admin{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="/admin/seasons" class="back-link">&larr; All Seasons</a>
+  <h2 style="margin-bottom:0;">{{ season.name }}</h2>
+  {% if is_current %}
+    <span class="badge badge-info">Current</span>
+  {% elif is_future %}
+    <span class="badge">Upcoming</span>
+  {% else %}
+    <span class="badge" style="opacity:0.6;">Ended</span>
+  {% endif %}
+  <span style="font-size:12px;color:var(--text-subtle);">{{ season.start_date }} → {{ season.end_date }}</span>
+</div>
+
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <div class="stat-card">
+    <div class="stat-label">Submissions</div>
+    <div class="stat-value">{{ stats.total_submissions }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Players</div>
+    <div class="stat-value">{{ stats.unique_players }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Points</div>
+    <div class="stat-value">{{ stats.total_points | int }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Games Active</div>
+    <div class="stat-value">{{ stats.games_active }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Avg / Day</div>
+    <div class="stat-value">{{ stats.avg_daily_submissions }}</div>
+  </div>
+  {% if stats.most_active_date %}
+  <div class="stat-card">
+    <div class="stat-label">Busiest Day</div>
+    <div class="stat-value" style="font-size:14px;">{{ stats.most_active_date }}</div>
+    <div style="font-size:11px;color:var(--text-subtle);margin-top:4px;">{{ stats.most_active_date_count }} submissions</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if not is_future %}
+
+{% if daily_activity %}
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Daily Activity</div>
+<div class="card" style="padding:16px;margin-bottom:24px;">
+  <div style="position:relative;height:200px;"><canvas id="activityChart"></canvas></div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Leaderboard</div>
+    {% if leaderboard %}
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Points</th>
+          <th>Subs</th>
+          <th>Games</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in leaderboard %}
+        <tr>
+          <td>
+            {% if row.rank == 1 %}<span class="rank-1">🥇</span>
+            {% elif row.rank == 2 %}<span class="rank-2">🥈</span>
+            {% elif row.rank == 3 %}<span class="rank-3">🥉</span>
+            {% else %}<span class="text-subtle">#{{ row.rank }}</span>{% endif %}
+          </td>
+          <td><a href="/admin/users/{{ row.user_id }}" class="text-link" style="text-decoration:none;">{{ row.username }}</a></td>
+          <td><strong>{{ row.total_score | int }}</strong></td>
+          <td>{{ row.submission_count }}</td>
+          <td>{{ row.games_played }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No submissions yet.</div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Game Breakdown</div>
+    {% if game_breakdown %}
+    <table>
+      <thead>
+        <tr>
+          <th>Game</th>
+          <th>Subs</th>
+          <th>Players</th>
+          <th>Top Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in game_breakdown %}
+        <tr>
+          <td><a href="/admin/games/{{ row.game_id }}" class="text-link" style="text-decoration:none;"><span class="badge badge-{{ row.game_id }}">{{ row.game_id }}</span></a></td>
+          <td>{{ row.submission_count }}</td>
+          <td>{{ row.unique_players }}</td>
+          <td>
+            {% if row.top_scorer_username %}
+            <strong>{{ row.top_score | int }}</strong>
+            <span style="color:var(--text-subtle);font-size:11px;">{{ row.top_scorer_username }}</span>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No game data.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% else %}
+<div class="empty" style="margin-bottom:24px;">Season hasn't started yet — no data to show.</div>
+{% endif %}
+
+<div class="card" style="padding:16px;">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Edit Season</div>
+  <form method="post" action="/admin/seasons/{{ season.id }}/edit" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="filter-group">
+      <label>Name</label>
+      <input name="name" class="input" value="{{ season.name }}" style="width:160px;" required>
+    </div>
+    <div class="filter-group">
+      <label>Start Date</label>
+      <input name="start_date" type="date" class="input" value="{{ season.start_date }}" required>
+    </div>
+    <div class="filter-group">
+      <label>End Date</label>
+      <input name="end_date" type="date" class="input" value="{{ season.end_date }}" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <form method="post" action="/admin/seasons/{{ season.id }}/delete"
+          onsubmit="return confirm('Delete {{ season.name }}? This cannot be undone.')">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </form>
+</div>
+
+{% if daily_activity %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const DATA = {{ daily_activity | tojson }};
+
+  function getStyle() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      text:    s.getPropertyValue('--text').trim()        || '#222',
+      subtle:  s.getPropertyValue('--text-subtle').trim() || '#999',
+      border:  s.getPropertyValue('--border').trim()      || '#ddd',
+      primary: s.getPropertyValue('--c-primary').trim()   || '#e0457a',
+    };
+  }
+
+  let chart = null;
+
+  function buildChart() {
+    const canvas = document.getElementById('activityChart');
+    if (!canvas) return;
+    const s = getStyle();
+    const labels = DATA.map(d => d.date);
+    const counts = DATA.map(d => d.count);
+
+    const opts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: s.subtle, maxTicksLimit: 10 }, grid: { color: s.border } },
+        y: { beginAtZero: true, ticks: { color: s.subtle, precision: 0 }, grid: { color: s.border } },
+      },
+    };
+
+    if (chart) {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = counts;
+      chart.data.datasets[0].borderColor = s.primary;
+      chart.data.datasets[0].backgroundColor = s.primary + '33';
+      chart.options = opts;
+      chart.update();
+    } else {
+      chart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Submissions',
+            data: counts,
+            borderColor: s.primary,
+            backgroundColor: s.primary + '99',
+          }],
+        },
+        options: opts,
+      });
+    }
+  }
+
+  document.addEventListener('themechange', buildChart);
+  buildChart();
+})();
+</script>
+{% endif %}
+
+{% endblock %}

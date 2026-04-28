@@ -12,6 +12,7 @@ from web.routes import (
     leaderboard,
     live,
     monitoring,
+    seasons,
     stats,
     submissions,
     suggestions,
@@ -54,3 +55,4 @@ admin_router.include_router(users.router)
 admin_router.include_router(monitoring.router)
 admin_router.include_router(system.router)
 admin_router.include_router(homunculus.router)
+admin_router.include_router(seasons.router)

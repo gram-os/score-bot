@@ -3,8 +3,14 @@ import logging
 import discord
 from discord import app_commands
 
-from bot.achievements import ACHIEVEMENTS
-from bot.database import get_current_season, get_user_achievements, get_user_best_streaks, log_usage_event
+from bot.achievements import ACHIEVEMENTS, resolve_achievement_def
+from bot.database import (
+    get_current_season,
+    get_user_achievements,
+    get_user_best_streaks,
+    get_user_total_freezes,
+    log_usage_event,
+)
 from bot.helpers import UserOverview, format_badges, get_user_overview
 
 log = logging.getLogger(__name__)
@@ -25,8 +31,9 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             season = get_current_season(session)
             season_label = season.name if season else None
             best_current, best_ever = get_user_best_streaks(session, target_id)
+            total_freezes = get_user_total_freezes(session, target_id)
             user_achievements = get_user_achievements(session, target_id)
-            earned_count = sum(1 for ua in user_achievements if ua.achievement_slug in ACHIEVEMENTS)
+            earned_count = sum(1 for ua in user_achievements if resolve_achievement_def(ua.achievement_slug))
             achievement_badges = format_badges(user_achievements)
             log_usage_event(
                 session,
@@ -60,9 +67,10 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
         )
 
         streak_current = f"🔥 {best_current} days" if best_current else "—"
+        freeze_str = f"  ·  🧊 {total_freezes} freeze{'s' if total_freezes != 1 else ''}" if total_freezes > 0 else ""
         embed.add_field(
             name="🔥 Streaks",
-            value=f"Current: {streak_current}  ·  Best Ever: {best_ever} days",
+            value=f"Current: {streak_current}  ·  Best Ever: {best_ever} days{freeze_str}",
             inline=False,
         )
 

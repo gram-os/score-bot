@@ -54,13 +54,15 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
         data = get_weekly_digest(session)
         ended_season = get_season_ending_yesterday(session)
         season_champion_user_id: str | None = None
+        season_end_embed: discord.Embed | None = None
 
         if ended_season:
-            champion_row = session.execute(
+            top_rows = session.execute(
                 select(
                     Submission.user_id,
                     User.username,
                     func.sum(Submission.total_score).label("pts"),
+                    func.count(Submission.id).label("cnt"),
                 )
                 .join(User, Submission.user_id == User.user_id)
                 .where(
@@ -69,11 +71,12 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
                 )
                 .group_by(Submission.user_id)
                 .order_by(func.sum(Submission.total_score).desc())
-                .limit(1)
-            ).first()
+                .limit(3)
+            ).all()
 
-            if champion_row:
-                newly_awarded = award_season_champion(session, champion_row.user_id)
+            if top_rows:
+                champion_row = top_rows[0]
+                newly_awarded = award_season_champion(session, champion_row.user_id, ended_season.id)
                 session.commit()
                 if newly_awarded:
                     season_champion_user_id = champion_row.user_id
@@ -82,6 +85,35 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
                         champion_row.username,
                         ended_season.name,
                     )
+
+                medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+                standing_lines = [
+                    f"{medals[i + 1]} **{row.username}** — {row.pts:.0f} pts ({row.cnt} submissions)"
+                    for i, row in enumerate(top_rows)
+                ]
+                season_end_embed = discord.Embed(
+                    title=f"🏁  {ended_season.name} has ended!",
+                    color=discord.Color.gold(),
+                )
+                season_end_embed.add_field(
+                    name="Final Standings",
+                    value="\n".join(standing_lines),
+                    inline=False,
+                )
+                season_end_embed.set_footer(text=f"{ended_season.start_date} – {ended_season.end_date}")
+
+    if season_end_embed is not None:
+        await channel.send(embed=season_end_embed)
+
+    if season_champion_user_id:
+        try:
+            champ_user = await client.fetch_user(int(season_champion_user_id))
+            await champ_user.send(
+                f"👑 You finished **#1** in the **{ended_season.name}** season! "
+                "Achievement unlocked: **Season Champion**."
+            )
+        except Exception:
+            log.warning("Could not DM season champion %s", season_champion_user_id)
 
     if data.total_submissions == 0:
         return
@@ -125,13 +157,3 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
 
     await channel.send(embed=embed)
     log.info("Weekly digest sent for week ending %s", data.week_end)
-
-    if season_champion_user_id:
-        try:
-            champ_user = await client.fetch_user(int(season_champion_user_id))
-            await champ_user.send(
-                f"👑 You finished **#1** in the **{ended_season.name}** season! "
-                "Achievement unlocked: **Season Champion**."
-            )
-        except Exception:
-            log.warning("Could not DM season champion %s", season_champion_user_id)
