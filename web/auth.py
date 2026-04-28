@@ -6,6 +6,7 @@ from starlette.responses import RedirectResponse
 
 from web.deps import require_homunculus_access
 from web.routes import (
+    dashboard,
     feedback,
     games,
     homunculus,
@@ -40,9 +41,10 @@ async def logout(request: Request):
 async def admin_index(request: Request, session: dict = Depends(require_homunculus_access)):
     if session.get("role") == "homunculus_viewer":
         return RedirectResponse(url="/admin/homunculus", status_code=302)
-    return RedirectResponse(url="/admin/submissions", status_code=302)
+    return RedirectResponse(url="/admin/dashboard", status_code=302)
 
 
+admin_router.include_router(dashboard.router)
 admin_router.include_router(submissions.router)
 admin_router.include_router(games.router)
 admin_router.include_router(stats.router)
