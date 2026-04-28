@@ -44,22 +44,3 @@ async def not_authenticated_handler(request: Request, exc: NotAuthenticated):
 @app.get("/")
 async def root():
     return RedirectResponse(url="/admin", status_code=302)
-
-
-@app.get("/debug/headers")
-async def debug_headers(request: Request):
-    from web.deps import verify_cf_jwt
-
-    token = request.headers.get("cf-access-jwt-assertion", "")
-    verify_error = ""
-    if token:
-        try:
-            await verify_cf_jwt(token)
-            verify_error = "OK"
-        except Exception as e:
-            verify_error = f"{type(e).__name__}: {e}"
-    return {
-        "cf_aud_env": os.environ.get("CF_AUD", ""),
-        "cf_team_domain_env": os.environ.get("CF_TEAM_DOMAIN", ""),
-        "verify_result": verify_error,
-    }
