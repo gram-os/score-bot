@@ -53,9 +53,11 @@ class QuordleParser(GameParser):
         total_attempts = sum(attempts)
         failed = 9 in attempts
 
-        # base_score = max(0, 100 - (total_attempts - 4) * 10)
-        # best case: 4 attempts total (1 each) → 60 pts; worst: clamped to 0
-        base_score = float(max(0, 100 - (total_attempts - 4) * 10))
+        if failed:
+            base_score = 0.0
+        else:
+            avg_attempts = total_attempts / 4
+            base_score = min(100.0, max(0.0, (9.0 - avg_attempts) / 5.0 * 100))
 
         return ParseResult(
             game_id=self.game_id,
