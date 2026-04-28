@@ -221,23 +221,29 @@
 
     const s = getStyle();
     const c = getColors();
+
+    const allDates = [...new Set(data.map(p => p.date))].sort();
     let datasets;
 
     if (gameId) {
+      const dateToScore = Object.fromEntries(data.map(p => [p.date, p.score]));
       datasets = [{
         label: gameId,
-        data: data.map(p => ({ x: p.date, y: p.score })),
+        data: allDates.map(d => dateToScore[d] ?? null),
+        spanGaps: false,
         borderColor: c[0], backgroundColor: c[0] + '22',
         tension: 0.3, pointRadius: 3, fill: false,
       }];
     } else {
       const gameMap = {};
       for (const p of data) {
-        if (!gameMap[p.game_id]) gameMap[p.game_id] = [];
-        gameMap[p.game_id].push({ x: p.date, y: p.score });
+        if (!gameMap[p.game_id]) gameMap[p.game_id] = {};
+        gameMap[p.game_id][p.date] = p.score;
       }
-      datasets = Object.entries(gameMap).map(([gid, pts], i) => ({
-        label: gid, data: pts,
+      datasets = Object.entries(gameMap).map(([gid, dateMap], i) => ({
+        label: gid,
+        data: allDates.map(d => dateMap[d] ?? null),
+        spanGaps: false,
         borderColor: c[i % c.length], backgroundColor: c[i % c.length] + '22',
         tension: 0.3, pointRadius: 3, fill: false,
       }));
@@ -245,20 +251,20 @@
 
     const opts = {
       responsive: true, maintainAspectRatio: false,
-      parsing: false,
       plugins: { legend: { position: 'bottom', labels: { color: s.text } } },
       scales: {
-        x: { type: 'category', ticks: { color: s.subtle, maxTicksLimit: 12 }, grid: { color: s.border } },
+        x: { type: 'category', labels: allDates, ticks: { color: s.subtle, maxTicksLimit: 12 }, grid: { color: s.border } },
         y: { beginAtZero: true, ticks: { color: s.subtle }, grid: { color: s.border } },
       },
     };
 
     if (scoreChart) {
+      scoreChart.data.labels = allDates;
       scoreChart.data.datasets = datasets;
       scoreChart.options = opts;
       scoreChart.update();
     } else {
-      scoreChart = new Chart(canvas.getContext('2d'), { type: 'line', data: { datasets }, options: opts });
+      scoreChart = new Chart(canvas.getContext('2d'), { type: 'line', data: { labels: allDates, datasets }, options: opts });
     }
   }
 
