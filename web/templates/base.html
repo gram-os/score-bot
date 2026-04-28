@@ -72,6 +72,8 @@
       --parse-match-border: #f4b8cf;
 
       --shadow: #e8a8c0;
+
+      --sidebar-width: 200px;
     }
 
     /* === MIDNIGHT BLOOM (dark variant) === */
@@ -159,51 +161,99 @@
       background: var(--bg);
     }
 
-    /* === HEADER === */
-    header {
-      background: var(--header-bg);
-      color: #fff;
-      padding: 0 20px;
+    /* === LAYOUT === */
+    .layout {
       display: flex;
-      align-items: center;
-      gap: 20px;
-      border-bottom: 2px solid var(--c-primary);
-      min-height: 48px;
+      min-height: 100vh;
     }
 
-    header h1 {
+    /* === SIDEBAR === */
+    .sidebar {
+      width: var(--sidebar-width);
+      flex-shrink: 0;
+      background: var(--header-bg);
+      border-right: 2px solid var(--c-primary);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 100;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid var(--border-light);
+      flex-shrink: 0;
+    }
+
+    .sidebar-header h1 {
       font-family: 'Press Start 2P', 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 8px;
       font-weight: 400;
       color: var(--c-primary);
       letter-spacing: 1px;
-      white-space: nowrap;
     }
 
-    nav { display: flex; gap: 2px; flex: 1; }
+    .sidebar-nav {
+      flex: 1;
+      padding: 10px 0 6px;
+      overflow-y: auto;
+    }
 
-    nav a {
+    .sidebar-nav a {
+      display: block;
       color: var(--text-muted);
       text-decoration: none;
       font-size: 11px;
-      padding: 4px 7px;
-      border: 1px solid transparent;
+      padding: 7px 16px;
       font-family: 'Courier New', monospace;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       white-space: nowrap;
+      border-left: 2px solid transparent;
     }
 
-    nav a:hover { color: var(--c-primary); border-color: var(--c-primary); }
-
-    nav a.active {
+    .sidebar-nav a:hover {
       color: var(--c-primary);
-      border-color: var(--c-primary);
+      background: rgba(224, 69, 122, 0.08);
     }
 
-    nav a.active::before { content: "> "; }
+    .sidebar-nav a.active {
+      color: var(--c-primary);
+      background: rgba(224, 69, 122, 0.12);
+      border-left-color: var(--c-primary);
+    }
 
-    .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .sidebar-nav a.active::before { content: "> "; }
+
+    .nav-section { margin-top: 14px; }
+
+    .nav-section-label {
+      display: block;
+      font-size: 9px;
+      color: var(--text-subtle);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 0 16px 5px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border-light);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .footer-theme-btns {
+      display: flex;
+      gap: 6px;
+    }
 
     .theme-btn {
       background: transparent;
@@ -231,8 +281,17 @@
     }
     .logout:hover { color: var(--c-primary); }
 
-    /* === LAYOUT === */
-    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    /* === CONTENT AREA === */
+    .content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      min-height: 100vh;
+    }
+
+    main {
+      padding: 24px;
+      max-width: 1200px;
+    }
 
     h2 {
       font-size: 13px;
@@ -248,6 +307,62 @@
       text-transform: uppercase;
       letter-spacing: 1px;
       color: var(--text-muted);
+    }
+
+    /* === MOBILE TOP BAR === */
+    .mobile-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--header-bg);
+      border-bottom: 2px solid var(--c-primary);
+      position: sticky;
+      top: 0;
+      z-index: 90;
+    }
+
+    .mobile-bar h1 {
+      font-family: 'Press Start 2P', 'Courier New', monospace;
+      font-size: 8px;
+      font-weight: 400;
+      color: var(--c-primary);
+      letter-spacing: 1px;
+      flex: 1;
+    }
+
+    .nav-toggle {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 22px;
+      height: 16px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .nav-toggle span {
+      display: block;
+      width: 100%;
+      height: 2px;
+      background: var(--c-primary);
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* sidebar overlay for mobile */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 99;
     }
 
     /* === FILTERS === */
@@ -301,7 +416,7 @@
       resize: vertical;
     }
 
-    /* === BUTTONS — pixel style === */
+    /* === BUTTONS === */
     .btn {
       padding: 7px 14px;
       border: 2px solid transparent;
@@ -488,59 +603,24 @@
     /* === CHART GRID === */
     .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-    /* === HAMBURGER BUTTON — hidden on desktop === */
-    .nav-toggle {
-      display: none;
-      flex-direction: column;
-      justify-content: space-between;
-      width: 22px;
-      height: 16px;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-      flex-shrink: 0;
-      margin-left: auto;
-    }
-
-    .nav-toggle span {
-      display: block;
-      width: 100%;
-      height: 2px;
-      background: var(--c-primary);
-      transition: transform 0.15s, opacity 0.15s;
-    }
-
-    .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-    .nav-toggle.open span:nth-child(2) { opacity: 0; }
-    .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
     /* === MOBILE === */
     @media (max-width: 768px) {
-      header { flex-wrap: wrap; padding: 10px 16px; gap: 8px; align-items: center; min-height: auto; }
-      header h1 { flex: 1; }
-      .nav-toggle { display: flex; }
-      .header-actions { order: 2; flex-shrink: 0; }
-
-      nav {
-        display: none;
-        order: 3;
-        flex-direction: column;
-        width: 100%;
-        flex: 0 0 100%;
-        gap: 2px;
-        padding: 8px 0 6px;
-        border-top: 1px solid var(--border);
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
       }
 
-      nav.open { display: flex; }
-      nav a { padding: 8px 10px; font-size: 12px; border: none; }
-      nav a:hover, nav a.active { background: rgba(224,69,122,0.12); }
+      .sidebar.open { transform: translateX(0); }
+
+      .sidebar-overlay.open { display: block; }
+
+      .mobile-bar { display: flex; }
+
+      .content { margin-left: 0; }
 
       main { padding: 16px; }
       h2 { font-size: 11px; }
 
-      /* Tables scroll horizontally; outline fills in since overflow:hidden conflicts with scrolling */
       table {
         display: block;
         overflow-x: auto;
@@ -600,38 +680,75 @@
   </style>
 </head>
 <body>
-  <header>
+
+  <!-- Mobile top bar (hidden on desktop) -->
+  <div class="mobile-bar" id="mobileBar">
     <h1>Score Bot</h1>
     <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
-    <nav id="mainNav">
-      {% set _role = request.session.get('role', 'admin') %}
-      {% if _role == 'admin' %}
-      <a href="/admin/submissions" {% if active == 'submissions' %}class="active"{% endif %}>Submissions</a>
-      <a href="/admin/live" {% if active == 'live' %}class="active"{% endif %}>Live</a>
-      <a href="/admin/leaderboard" {% if active == 'leaderboard' %}class="active"{% endif %}>Leaderboard</a>
-      <a href="/admin/stats" {% if active == 'stats' %}class="active"{% endif %}>Stats</a>
-      <a href="/admin/seasons" {% if active == 'seasons' %}class="active"{% endif %}>Seasons</a>
-      <a href="/admin/games" {% if active == 'games' %}class="active"{% endif %}>Games</a>
-      <a href="/admin/suggestions" {% if active == 'suggestions' %}class="active"{% endif %}>Suggestions</a>
-      <a href="/admin/feedback" {% if active == 'feedback' %}class="active"{% endif %}>Feedback</a>
-      <a href="/admin/users" {% if active == 'users' %}class="active"{% endif %}>Users</a>
-      <a href="/admin/tools" {% if active == 'tools' %}class="active"{% endif %}>Tools</a>
-      <a href="/admin/monitoring" {% if active == 'monitoring' %}class="active"{% endif %}>Monitoring</a>
-      <a href="/admin/system" {% if active == 'system' %}class="active"{% endif %}>System</a>
-      {% endif %}
-      <a href="/admin/homunculus" {% if active == 'homunculus' %}class="active"{% endif %}>Homunculus</a>
-    </nav>
-    <div class="header-actions">
-      <button class="theme-btn" id="darkToggle" title="Toggle dark mode">Dark</button>
-      <button class="theme-btn" id="cbToggle" title="Deuteranopia-friendly colors">CB</button>
-      <a href="/auth/logout" class="logout">Logout</a>
+  </div>
+
+  <!-- Overlay for mobile sidebar -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1>Score Bot</h1>
+      </div>
+
+      <nav class="sidebar-nav">
+        {% set _role = request.session.get('role', 'admin') %}
+        {% if _role == 'admin' %}
+
+        <a href="/admin/dashboard" {% if active == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+
+        <div class="nav-section">
+          <span class="nav-section-label">Play</span>
+          <a href="/admin/live" {% if active == 'live' %}class="active"{% endif %}>Live</a>
+          <a href="/admin/leaderboard" {% if active == 'leaderboard' %}class="active"{% endif %}>Leaderboard</a>
+          <a href="/admin/stats" {% if active == 'stats' %}class="active"{% endif %}>Stats</a>
+          <a href="/admin/seasons" {% if active == 'seasons' %}class="active"{% endif %}>Seasons</a>
+        </div>
+
+        <div class="nav-section">
+          <span class="nav-section-label">Data</span>
+          <a href="/admin/submissions" {% if active == 'submissions' %}class="active"{% endif %}>Submissions</a>
+          <a href="/admin/users" {% if active == 'users' %}class="active"{% endif %}>Users</a>
+          <a href="/admin/games" {% if active == 'games' %}class="active"{% endif %}>Games</a>
+        </div>
+
+        <div class="nav-section">
+          <span class="nav-section-label">Admin</span>
+          <a href="/admin/tools" {% if active == 'tools' %}class="active"{% endif %}>Tools</a>
+          <a href="/admin/suggestions" {% if active == 'suggestions' %}class="active"{% endif %}>Suggestions</a>
+          <a href="/admin/feedback" {% if active == 'feedback' %}class="active"{% endif %}>Feedback</a>
+          <a href="/admin/monitoring" {% if active == 'monitoring' %}class="active"{% endif %}>Monitoring</a>
+          <a href="/admin/system" {% if active == 'system' %}class="active"{% endif %}>System</a>
+        </div>
+
+        {% endif %}
+
+        <a href="/admin/homunculus" {% if active == 'homunculus' %}class="active"{% endif %} style="margin-top:14px;">Homunculus</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="footer-theme-btns">
+          <button class="theme-btn" id="darkToggle" title="Toggle dark mode">Dark</button>
+          <button class="theme-btn" id="cbToggle" title="Deuteranopia-friendly colors">CB</button>
+        </div>
+        <a href="/auth/logout" class="logout">Logout</a>
+      </div>
+    </aside>
+
+    <div class="content">
+      <main>
+        {% block content %}{% endblock %}
+      </main>
     </div>
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+  </div>
+
   <script>
   (function () {
     var html = document.documentElement;
@@ -668,6 +785,7 @@
       document.dispatchEvent(new Event('themechange'));
     });
 
+    // Table sorting
     function cellText(row, idx) {
       return (row.cells[idx]?.innerText ?? '').trim();
     }
@@ -727,26 +845,44 @@
         });
       });
     });
-  })();
 
-  (function () {
+    // Mobile sidebar toggle
     var toggle = document.getElementById('navToggle');
-    var nav = document.getElementById('mainNav');
-    if (!toggle || !nav) return;
-    toggle.addEventListener('click', function () {
-      var isOpen = nav.classList.toggle('open');
-      toggle.classList.toggle('open', isOpen);
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    });
-    nav.addEventListener('click', function (e) {
-      if (e.target.tagName === 'A') {
-        nav.classList.remove('open');
-        toggle.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
-      }
-    });
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+      toggle.classList.add('open');
+      toggle.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+      toggle.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+      });
+    }
+
+    if (overlay) {
+      overlay.addEventListener('click', closeSidebar);
+    }
+
+    if (sidebar) {
+      sidebar.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', closeSidebar);
+      });
+    }
   })();
 
+  // Falling petals
   (function () {
     var colors = ['#f9a8d4','#fbcfe8','#fecdd3','#f4b8d0','#fda4af','#fce7f3'];
     for (var i = 0; i < 9; i++) {
