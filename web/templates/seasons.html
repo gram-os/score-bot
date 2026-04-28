@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Seasons — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Seasons</h2>
+
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<div class="card" style="padding:16px;margin-bottom:24px;">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Create Season</div>
+  <form method="post" action="/admin/seasons/create" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="filter-group">
+      <label>Name</label>
+      <input name="name" class="input" placeholder="Season 2" style="width:160px;" required>
+    </div>
+    <div class="filter-group">
+      <label>Start Date</label>
+      <input name="start_date" type="date" class="input" required>
+    </div>
+    <div class="filter-group">
+      <label>End Date</label>
+      <input name="end_date" type="date" class="input" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+  </form>
+</div>
+
+{% if summaries %}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Dates</th>
+      <th>Status</th>
+      <th>Submissions</th>
+      <th>Players</th>
+      <th>Champion</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in summaries %}
+    {% set season = s.season %}
+    <tr>
+      <td><a href="/admin/seasons/{{ season.id }}" class="text-link" style="font-weight:600;">{{ season.name }}</a></td>
+      <td style="font-size:12px;color:var(--text-subtle);">{{ season.start_date }} → {{ season.end_date }}</td>
+      <td>
+        {% if season.start_date <= today <= season.end_date %}
+          <span class="badge badge-info">Current</span>
+        {% elif season.start_date > today %}
+          <span class="badge">Upcoming</span>
+        {% else %}
+          <span class="badge" style="opacity:0.6;">Ended</span>
+        {% endif %}
+      </td>
+      <td>{{ s.total_submissions }}</td>
+      <td>{{ s.unique_players }}</td>
+      <td>
+        {% if s.champion_username %}
+        👑 {{ s.champion_username }} <span style="color:var(--text-subtle);font-size:12px;">({{ s.champion_points | int }} pts)</span>
+        {% else %}
+        <span class="text-subtle">—</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="/admin/seasons/{{ season.id }}" class="btn btn-secondary" style="text-decoration:none;font-size:10px;">View</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No seasons yet — create one above.</div>
+{% endif %}
+{% endblock %}

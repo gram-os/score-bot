@@ -28,6 +28,11 @@ def get_streak(session: Session, user_id: str, game_id: str) -> int:
     return row.current_streak if _is_streak_active(row) else 0
 
 
+def get_user_total_freezes(session: Session, user_id: str) -> int:
+    rows = session.scalars(select(UserStreak).where(UserStreak.user_id == user_id)).all()
+    return sum(r.freeze_count for r in rows)
+
+
 def get_user_best_streaks(session: Session, user_id: str) -> tuple[int, int]:
     """Returns (best active streak, best ever streak) across all games."""
     rows = session.scalars(select(UserStreak).where(UserStreak.user_id == user_id)).all()

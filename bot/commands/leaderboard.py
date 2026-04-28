@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 import discord
 from discord import app_commands
@@ -57,6 +58,18 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
         return game_autocomplete_choices(registry, current, include_all=True)
 
 
+def _season_countdown(season) -> str | None:
+    if season is None:
+        return None
+    today = datetime.now(timezone.utc).date()
+    days_left = (season.end_date - today).days
+    if days_left < 0 or days_left > 7:
+        return None
+    if days_left == 0:
+        return f"⏳ Last day of {season.name}!"
+    return f"⏳ {days_left} day{'s' if days_left != 1 else ''} remaining in {season.name}"
+
+
 async def _build_per_game_embed(session, game_id: str, game_label: str) -> discord.Embed:
     embed = discord.Embed(title=f"Leaderboard — {game_label}", color=discord.Color.gold())
     streak_map = {uid: streak for uid, _, streak in get_all_streaks(session, game_id)}
@@ -81,6 +94,10 @@ async def _build_per_game_embed(session, game_id: str, game_label: str) -> disco
             lines.append(f"{medal} **{row.username}**{streak_str} — {row.total_score:.0f} pts")
         embed.add_field(name=period_label, value="\n".join(lines), inline=False)
 
+    countdown = _season_countdown(current_season)
+    if countdown:
+        embed.set_footer(text=countdown)
+
     return embed
 
 
@@ -99,8 +116,8 @@ async def _build_single_period_embed(
     else:
         streak_map = {uid: streak for uid, _, streak in get_all_streaks(session, game_id)}
 
+    current_season = get_current_season(session)
     if period_value == "season":
-        current_season = get_current_season(session)
         period_label = current_season.name if current_season else "Season"
     else:
         period_label = PERIOD_LABELS[period_value]
@@ -121,5 +138,10 @@ async def _build_single_period_embed(
                 f" ({row.submission_count} sub{'s' if row.submission_count != 1 else ''})"
             )
         embed.description = "\n".join(lines)
+
+    if period_value == "season":
+        countdown = _season_countdown(current_season)
+        if countdown:
+            embed.set_footer(text=countdown)
 
     return embed

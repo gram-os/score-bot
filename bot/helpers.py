@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 from discord import app_commands
 
-from bot.achievements import ACHIEVEMENTS
+from bot.achievements import resolve_achievement_def
 from bot.database import get_leaderboard
 
 
@@ -23,7 +23,9 @@ def get_user_overview(session, user_id: str) -> UserOverview:
 
 
 def format_badges(user_achievements, separator: str = "  ·  ") -> str:
-    parts = [f"{ach.icon} {ach.name}" for ua in user_achievements if (ach := ACHIEVEMENTS.get(ua.achievement_slug))]
+    parts = [
+        f"{ach.icon} {ach.name}" for ua in user_achievements if (ach := resolve_achievement_def(ua.achievement_slug))
+    ]
     return separator.join(parts) if parts else "None yet — keep playing!"
 
 

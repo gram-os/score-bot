@@ -18,6 +18,7 @@ from bot.commands import (
     mystats,
     profile,
     remind,
+    seasons,
     suggest,
     submitted,
     vs,
@@ -57,6 +58,7 @@ _COMMAND_MODULES = [
     help,
     homunculus,
     submitted,
+    seasons,
 ]
 
 

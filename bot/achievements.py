@@ -51,14 +51,23 @@ ACHIEVEMENTS: dict[str, AchievementDef] = {
             "Save a streak by using a freeze",
             "🧊",
         ),
-        AchievementDef(
-            "season_champion",
-            "Season Champion",
-            "Finish #1 overall in any season",
-            "👑",
-        ),
     ]
 }
+
+SEASON_CHAMPION_DEF = AchievementDef(
+    "season_champion",
+    "Season Champion",
+    "Finish #1 overall in a season",
+    "👑",
+)
+
+
+def resolve_achievement_def(slug: str) -> AchievementDef | None:
+    if slug in ACHIEVEMENTS:
+        return ACHIEVEMENTS[slug]
+    if slug.startswith("season_champion_"):
+        return SEASON_CHAMPION_DEF
+    return None
 
 
 def check_and_award_achievements(
@@ -87,6 +96,7 @@ def check_and_award_achievements(
                 UserAchievement(
                     user_id=user_id,
                     achievement_slug=slug,
+                    display_name=ACHIEVEMENTS[slug].name,
                     earned_at=now,
                 )
             )

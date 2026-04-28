@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
-from bot.achievements import ACHIEVEMENTS
+from bot.achievements import ACHIEVEMENTS, SEASON_CHAMPION_DEF
 from bot.database import (
     Submission,
     get_head_to_head,
@@ -11,6 +11,7 @@ from bot.database import (
     get_user_per_game_stats,
     get_user_score_history,
     get_user_submission_dates,
+    get_user_total_freezes,
     get_users_for_h2h,
     get_users_summary,
 )
@@ -22,7 +23,8 @@ router = APIRouter()
 def _build_achievement_list(user_achievements: list) -> list[dict]:
     earned_slugs = {ua.achievement_slug for ua in user_achievements}
     earned_at_by_slug = {ua.achievement_slug: ua.earned_at for ua in user_achievements}
-    return [
+
+    result = [
         {
             "slug": slug,
             "name": defn.name,
@@ -33,6 +35,21 @@ def _build_achievement_list(user_achievements: list) -> list[dict]:
         }
         for slug, defn in ACHIEVEMENTS.items()
     ]
+
+    for slug in sorted(earned_slugs):
+        if slug.startswith("season_champion_"):
+            result.append(
+                {
+                    "slug": slug,
+                    "name": SEASON_CHAMPION_DEF.name,
+                    "description": SEASON_CHAMPION_DEF.description,
+                    "icon": SEASON_CHAMPION_DEF.icon,
+                    "earned": True,
+                    "earned_at": earned_at_by_slug.get(slug),
+                }
+            )
+
+    return result
 
 
 @router.get("/users")
@@ -74,6 +91,7 @@ async def user_detail(
         games_played = sorted({s.game_id for s in submissions})
         user_achievements = get_user_achievements(db, user_id)
         best_current_streak, best_ever_streak = get_user_best_streaks(db, user_id)
+        total_freezes = get_user_total_freezes(db, user_id)
         per_game_stats = get_user_per_game_stats(db, user_id)
         submission_dates = get_user_submission_dates(db, user_id)
         h2h_users = get_users_for_h2h(db, exclude_user_id=user_id)
@@ -94,6 +112,7 @@ async def user_detail(
             "achievements": achievements,
             "best_current_streak": best_current_streak,
             "best_ever_streak": best_ever_streak,
+            "total_freezes": total_freezes,
             "per_game_stats": per_game_stats,
             "submission_dates": submission_dates,
             "h2h_users": h2h_users,
