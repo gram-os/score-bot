@@ -48,4 +48,20 @@ async def root():
 
 @app.get("/debug/headers")
 async def debug_headers(request: Request):
-    return dict(request.headers)
+    import base64
+    import json
+
+    token = request.headers.get("cf-access-jwt-assertion", "")
+    claims: dict = {}
+    if token:
+        try:
+            payload_b64 = token.split(".")[1]
+            payload_b64 += "=" * (4 - len(payload_b64) % 4)
+            claims = json.loads(base64.b64decode(payload_b64))
+        except Exception:
+            pass
+    return {
+        "cf_aud_env": os.environ.get("CF_AUD", ""),
+        "cf_team_domain_env": os.environ.get("CF_TEAM_DOMAIN", ""),
+        "jwt_claims": claims,
+    }
