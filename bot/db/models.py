@@ -46,6 +46,7 @@ class Submission(Base):
     total_score: Mapped[float] = mapped_column(Float, nullable=False)
     submission_rank: Mapped[int] = mapped_column(Integer, nullable=False)
     raw_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    message_text: Mapped[str | None] = mapped_column(String, nullable=True)
     submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     game: Mapped["Game"] = relationship("Game", back_populates="submissions")

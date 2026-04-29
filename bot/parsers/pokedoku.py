@@ -45,4 +45,5 @@ class PokeDokuParser(GameParser):
             date=timestamp.date(),
             base_score=base_score,
             raw_data=raw_data,
+            message_text=message,
         )

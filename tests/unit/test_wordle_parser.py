@@ -82,3 +82,9 @@ class TestWordleParserParse:
 
     def test_returns_none_for_non_matching(self):
         assert self.parser.parse("not a wordle result", USER_ID, TIMESTAMP) is None
+
+    def test_message_text_stored(self):
+        msg = "Wordle 1338 3/6\n🟨⬜⬜⬜🟩\n🟩🟩⬜⬜🟩\n🟩🟩🟩🟩🟩"
+        result = self.parser.parse(msg, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.message_text == msg

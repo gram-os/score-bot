@@ -47,6 +47,7 @@ def record_submission(session: Session, parse_result, username: str) -> "Submiss
         total_score=parse_result.base_score,
         submission_rank=0,
         raw_data=parse_result.raw_data,
+        message_text=parse_result.message_text,
         submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     session.add(submission)

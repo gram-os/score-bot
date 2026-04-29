@@ -53,4 +53,5 @@ class WordleParser(GameParser):
                 "max_attempts": 6,
                 "hard_mode": hard_mode,
             },
+            message_text=message,
         )

@@ -69,4 +69,5 @@ class QuordleParser(GameParser):
                 "total_attempts": total_attempts,
                 "failed": failed,
             },
+            message_text=message,
         )

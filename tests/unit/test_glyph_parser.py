@@ -55,3 +55,9 @@ class TestGlyphParserParse:
 
     def test_returns_none_for_non_matching(self):
         assert self.parser.parse("not glyph", USER_ID, TIMESTAMP) is None
+
+    def test_message_text_stored(self):
+        msg = "Glyph 2024-01-15 | 2/4"
+        result = self.parser.parse(msg, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.message_text == msg

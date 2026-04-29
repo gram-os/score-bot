@@ -55,6 +55,7 @@ class BetweenleParser(GameParser):
                     "total_guesses": None,
                     "max_guesses": _MAX_GUESSES,
                 },
+                message_text=message,
             )
 
         total_guesses = _count_guesses(message)
@@ -71,4 +72,5 @@ class BetweenleParser(GameParser):
                 "total_guesses": total_guesses,
                 "max_guesses": _MAX_GUESSES,
             },
+            message_text=message,
         )

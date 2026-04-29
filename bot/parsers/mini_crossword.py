@@ -44,4 +44,5 @@ class MiniCrosswordParser(GameParser):
                 "seconds": seconds,
                 "total_seconds": total_seconds,
             },
+            message_text=message,
         )

@@ -434,3 +434,93 @@ def get_users_for_h2h(session: Session, exclude_user_id: str) -> list[dict]:
         .order_by(Submission.username.asc())
     ).all()
     return [{"user_id": row.user_id, "username": row.username} for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Enhanced analytics
+# ---------------------------------------------------------------------------
+
+
+def get_user_score_percentile(session: Session, user_id: str, game_id: str) -> float | None:
+    """Return the percentile (0–100) of a user's average base_score for a game.
+
+    A result of 80 means the user scores better than 80% of other players.
+    Returns None when there is insufficient data (< 2 players with submissions).
+    """
+    avg_rows = session.execute(
+        select(Submission.user_id, func.avg(Submission.base_score).label("avg_score"))
+        .where(Submission.game_id == game_id)
+        .group_by(Submission.user_id)
+    ).all()
+
+    if len(avg_rows) < 2:
+        return None
+
+    all_avgs = [row.avg_score for row in avg_rows]
+    user_avg = next((row.avg_score for row in avg_rows if row.user_id == user_id), None)
+    if user_avg is None:
+        return None
+
+    beaten = sum(1 for a in all_avgs if user_avg > a)
+    return round(beaten / (len(all_avgs) - 1) * 100, 1)
+
+
+@dataclass
+class ParticipationRate:
+    game_id: str
+    game_name: str
+    user_submissions: int
+    total_active_days: int
+    rate: float
+
+
+def get_user_participation_rates(session: Session, user_id: str) -> list[ParticipationRate]:
+    """Return per-game participation rate: user submissions / days the game was played by anyone."""
+    user_counts = {
+        row.game_id: row.cnt
+        for row in session.execute(
+            select(Submission.game_id, func.count(distinct(Submission.date)).label("cnt"))
+            .where(Submission.user_id == user_id)
+            .group_by(Submission.game_id)
+        ).all()
+    }
+
+    global_counts = session.execute(
+        select(
+            Submission.game_id,
+            Game.name.label("game_name"),
+            func.count(distinct(Submission.date)).label("cnt"),
+        )
+        .join(Game, Submission.game_id == Game.id)
+        .group_by(Submission.game_id, Game.name)
+    ).all()
+
+    result = []
+    for row in global_counts:
+        user_days = user_counts.get(row.game_id, 0)
+        rate = round(user_days / row.cnt, 4) if row.cnt > 0 else 0.0
+        result.append(
+            ParticipationRate(
+                game_id=row.game_id,
+                game_name=row.game_name,
+                user_submissions=user_days,
+                total_active_days=row.cnt,
+                rate=rate,
+            )
+        )
+    return sorted(result, key=lambda r: r.rate, reverse=True)
+
+
+@dataclass
+class HourBucket:
+    hour: int
+    count: int
+
+
+def get_submission_hour_distribution(session: Session) -> list[HourBucket]:
+    """Return submission counts bucketed by UTC hour-of-day (0–23)."""
+    rows = session.execute(select(Submission.submitted_at)).scalars().all()
+    counts: dict[int, int] = {h: 0 for h in range(24)}
+    for submitted_at in rows:
+        counts[submitted_at.hour] += 1
+    return [HourBucket(hour=h, count=counts[h]) for h in range(24)]

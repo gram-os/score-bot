@@ -68,4 +68,5 @@ class EncloseHorseParser(GameParser):
                 "main_pct": main_pct,
                 "bonus_rounds": bonus_rounds,
             },
+            message_text=message,
         )

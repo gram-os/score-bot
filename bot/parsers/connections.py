@@ -55,4 +55,5 @@ class ConnectionsParser(GameParser):
                 "misses": misses,
                 "rows_played": len(rows),
             },
+            message_text=message,
         )
