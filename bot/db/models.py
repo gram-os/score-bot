@@ -168,6 +168,22 @@ class HomunculusUpgrade(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
+class MonthlyRankSnapshot(Base):
+    __tablename__ = "monthly_rank_snapshots"
+    __table_args__ = (UniqueConstraint("user_id", "year", "month"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_score: Mapped[float] = mapped_column(Float, nullable=False)
+    submission_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    player_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshotted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class Feedback(Base):
     __tablename__ = "feedback"
 
