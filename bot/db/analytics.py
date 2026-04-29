@@ -441,6 +441,47 @@ def get_users_for_h2h(session: Session, exclude_user_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+@dataclass
+class GameAnalysisRow:
+    game_id: str
+    game_name: str
+    submission_count: int
+    avg_base_score: float
+    median_score: float
+    std_dev: float
+    fail_rate: float
+    perfect_rate: float
+    suggested_multiplier: float | None
+    distribution: list[ScoreBucket]
+
+
+def get_all_games_difficulty_analysis(session: Session, reference_avg: float = 50.0) -> list[GameAnalysisRow]:
+    games = session.execute(select(Game).where(Game.enabled.is_(True)).order_by(Game.name)).scalars().all()
+    result = []
+    for game in games:
+        metrics = get_game_difficulty_metrics(session, game.id)
+        if not metrics:
+            continue
+        distribution = get_score_distribution(session, game.id)
+        multiplier = round(reference_avg / metrics.avg_base_score, 2) if metrics.avg_base_score > 0 else None
+        result.append(
+            GameAnalysisRow(
+                game_id=game.id,
+                game_name=game.name,
+                submission_count=metrics.total_submissions,
+                avg_base_score=metrics.avg_base_score,
+                median_score=metrics.median_score,
+                std_dev=metrics.stddev_base_score,
+                fail_rate=round(metrics.fail_rate * 100, 1),
+                perfect_rate=round(metrics.perfect_rate * 100, 1),
+                suggested_multiplier=multiplier,
+                distribution=distribution,
+            )
+        )
+    result.sort(key=lambda r: r.avg_base_score)
+    return result
+
+
 def get_user_score_percentile(session: Session, user_id: str, game_id: str) -> float | None:
     """Return the percentile (0–100) of a user's average base_score for a game.
 
