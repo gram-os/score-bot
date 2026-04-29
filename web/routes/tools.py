@@ -7,7 +7,7 @@ import httpx
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
-from bot.database import bulk_delete_submissions
+from bot.database import backfill_monthly_rank_snapshots, bulk_delete_submissions
 from bot.parsers.registry import all_parsers
 from web.backfill import process_messages
 from web.deps import _db_session, fetch_all_games, require_admin, templates
@@ -201,3 +201,33 @@ async def tools_backfill(
             "backfill_range": f"{start_date} → {end_date}",
         },
     )
+
+
+@router.post("/tools/backfill-monthly-ranks")
+async def tools_backfill_monthly_ranks(
+    request: Request,
+    admin_session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        result = backfill_monthly_rank_snapshots(db)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    log.info(
+        "Admin %s ran monthly rank backfill: %d records created across %d months (%d already existed)",
+        admin_session["email"],
+        result.records_created,
+        result.months_processed,
+        result.months_skipped,
+    )
+    request.session["flash"] = (
+        f"Monthly rank backfill complete: {result.records_created} snapshot records created "
+        f"across {result.months_processed} month(s). "
+        f"{result.months_skipped} month(s) already had snapshots and were skipped."
+    )
+    return RedirectResponse(url="/admin/tools", status_code=303)

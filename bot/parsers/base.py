@@ -10,6 +10,7 @@ class ParseResult:
     date: date
     base_score: float
     raw_data: dict = field(default_factory=dict)
+    message_text: str | None = None
 
 
 class GameParser(ABC):

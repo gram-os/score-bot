@@ -38,7 +38,7 @@ from bot.config import (
 from bot.database import get_engine
 from bot.log_handler import setup_db_logging
 from bot.parsers.registry import ParserRegistry
-from bot.tasks import digests, message_handler, polls, reminders, startup_backfill
+from bot.tasks import digests, message_handler, monthly_wrapped, polls, reminders, startup_backfill
 from bot.tasks import homunculus as homunculus_task
 
 logging.basicConfig(level=logging.INFO)
@@ -113,6 +113,11 @@ class ScoreBot(discord.Client):
                 CronTrigger(hour=REMINDER_HOUR, minute=REMINDER_MINUTE),
                 replace_existing=True,
             )
+            self._scheduler.add_job(
+                self._send_monthly_wrapped,
+                CronTrigger(day=1, hour=DIGEST_HOUR, minute=DIGEST_MINUTE),
+                replace_existing=True,
+            )
             self._scheduler.start()
             log.info("Digest scheduler started (fires at %02d:%02d local)", DIGEST_HOUR, DIGEST_MINUTE)
             log.info("Reminder scheduler started (fires at %02d:%02d local)", REMINDER_HOUR, REMINDER_MINUTE)
@@ -146,6 +151,9 @@ class ScoreBot(discord.Client):
 
     async def _send_streak_reminders(self) -> None:
         await reminders.send_streak_reminders(self, self.Session, DISCORD_CHANNEL_ID)
+
+    async def _send_monthly_wrapped(self) -> None:
+        await monthly_wrapped.send_monthly_wrapped(self, self.Session)
 
     async def on_app_command_error(
         self,

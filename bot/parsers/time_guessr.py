@@ -42,4 +42,5 @@ class TimeGuessrParser(GameParser):
                 "raw_score": raw_score,
                 "max_score": 50_000,
             },
+            message_text=message,
         )

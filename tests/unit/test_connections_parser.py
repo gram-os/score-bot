@@ -62,3 +62,8 @@ class TestConnectionsParserParse:
 
     def test_returns_none_for_unrecognised(self):
         assert self.parser.parse("unrelated message", USER_ID, TIMESTAMP) is None
+
+    def test_message_text_stored(self):
+        result = self.parser.parse(CONNECTIONS_PERFECT, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.message_text == CONNECTIONS_PERFECT

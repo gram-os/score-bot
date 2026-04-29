@@ -37,6 +37,7 @@ from bot.db.models import (
     Game,
     GameSuggestion,
     HomunculusUpgrade,
+    MonthlyRankSnapshot,
     Season,
     Submission,
     User,
@@ -45,6 +46,18 @@ from bot.db.models import (
     UserStreak,
     UsageEvent,
     get_engine,
+)
+from bot.db.monthly_stats import (
+    MonthlyGameStat,
+    MonthlyWrapped,
+    SnapshotBackfillResult,
+    backfill_monthly_rank_snapshots,
+    get_monthly_active_user_ids,
+    get_monthly_wrapped,
+    month_bounds,
+    monthly_report_already_sent,
+    prev_month,
+    snapshot_month,
 )
 from bot.db.personal_bests import PersonalBests, get_best_base_score, get_personal_bests
 from bot.db.preferences import get_opted_in_preferences, get_preference, set_preference
@@ -172,4 +185,15 @@ __all__ = [
     "add_homunculus_upgrade",
     "get_homunculus_upgrades",
     "homunculus_upgrade_exists",
+    "MonthlyRankSnapshot",
+    "MonthlyGameStat",
+    "MonthlyWrapped",
+    "SnapshotBackfillResult",
+    "backfill_monthly_rank_snapshots",
+    "get_monthly_active_user_ids",
+    "get_monthly_wrapped",
+    "month_bounds",
+    "monthly_report_already_sent",
+    "prev_month",
+    "snapshot_month",
 ]

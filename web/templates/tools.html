@@ -127,6 +127,19 @@
 </div>
 
 <div class="tool-section">
+  <h3>Monthly Rank Snapshot Backfill</h3>
+  <p class="tool-desc">
+    Computes and stores end-of-month leaderboard ranks for all historical months found in the
+    submissions table. Required before monthly Wrapped reports can show rank data. Safe to run
+    multiple times — months that already have snapshots are skipped automatically.
+  </p>
+  <form method="post" action="/admin/tools/backfill-monthly-ranks"
+        onsubmit="return confirm('Run monthly rank snapshot backfill? This may take a moment for large datasets.')">
+    <button type="submit" class="btn btn-primary">Run Backfill</button>
+  </form>
+</div>
+
+<div class="tool-section">
   <h3>Bulk Delete Submissions</h3>
   <p class="tool-desc">Delete all submissions for a specific game on a specific date. This cannot be undone.</p>
   <form method="post" action="/admin/tools/bulk-delete"

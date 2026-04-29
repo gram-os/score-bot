@@ -49,4 +49,5 @@ class GlyphParser(GameParser):
                 "attempts": attempts,
                 "max_attempts": 4,
             },
+            message_text=message,
         )
