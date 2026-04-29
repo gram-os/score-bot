@@ -1,5 +1,6 @@
 from bot.db.achievements import award_season_champion, get_user_achievements
 from bot.db.analytics import (
+    GameAnalysisRow,
     GameDifficultyMetrics,
     GameDifficultyRow,
     GameSpeedBonusStats,
@@ -9,6 +10,7 @@ from bot.db.analytics import (
     SpeedBonusLeader,
     UserGameRow,
     UserScorePoint,
+    get_all_games_difficulty_analysis,
     get_avg_score_over_time,
     get_game_difficulty_comparison,
     get_game_difficulty_metrics,
@@ -98,6 +100,8 @@ from bot.db.usage import get_usage_events, get_usage_summary, log_usage_event
 
 __all__ = [
     "AdminConfig",
+    "GameAnalysisRow",
+    "get_all_games_difficulty_analysis",
     "AppLog",
     "Base",
     "DailyPoll",

@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Difficulty Analysis — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Difficulty Analysis</h2>
+
+<p style="font-size:13px;color:var(--text-muted);max-width:720px;margin-bottom:24px;line-height:1.6;">
+  Each game's base scores are normalized to 0–100, but the <em>distributions</em> differ — a 60 in Time Guessr
+  and a 60 in Wordle don't represent the same effort. The <strong>suggested multiplier</strong> below shows
+  what factor would rescale each game's average to {{ reference_avg | int }} points, levelling the field.
+  A multiplier above 1× means harder-than-average; below 1× means easier-than-average.
+</p>
+
+{% if not game_stats %}
+<div class="empty">No submission data yet.</div>
+{% else %}
+
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Per-Game Stats (sorted hardest → easiest)</div>
+<table style="margin-bottom:32px;">
+  <thead>
+    <tr>
+      <th>Game</th>
+      <th>Submissions</th>
+      <th>Avg Score</th>
+      <th>Median</th>
+      <th>Std Dev</th>
+      <th>Fail Rate</th>
+      <th>Perfect Rate</th>
+      <th>Suggested Multiplier</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in game_stats %}
+    <tr>
+      <td><a href="/admin/games/{{ s.game_id }}">{{ s.game_name }}</a></td>
+      <td>{{ s.submission_count }}</td>
+      <td>
+        <span style="font-weight:600;">{{ s.avg_base_score }}</span>
+        <span style="font-size:11px;color:var(--text-subtle);">/100</span>
+      </td>
+      <td>{{ s.median_score }}</td>
+      <td style="color:var(--text-muted);">{{ s.std_dev }}</td>
+      <td>
+        {% if s.fail_rate >= 15 %}
+          <span style="color:var(--c-danger);font-weight:600;">{{ s.fail_rate }}%</span>
+        {% elif s.fail_rate >= 5 %}
+          <span style="color:#d97706;font-weight:600;">{{ s.fail_rate }}%</span>
+        {% else %}
+          <span style="color:var(--text-muted);">{{ s.fail_rate }}%</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if s.perfect_rate >= 20 %}
+          <span style="color:var(--c-success);font-weight:600;">{{ s.perfect_rate }}%</span>
+        {% else %}
+          <span style="color:var(--text-muted);">{{ s.perfect_rate }}%</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if s.suggested_multiplier is none %}
+          <span style="color:var(--text-subtle);">—</span>
+        {% elif s.suggested_multiplier >= 1.3 %}
+          <span style="color:var(--c-primary);font-weight:700;">{{ s.suggested_multiplier }}×</span>
+        {% elif s.suggested_multiplier <= 0.8 %}
+          <span style="color:var(--c-success);font-weight:700;">{{ s.suggested_multiplier }}×</span>
+        {% else %}
+          <span style="color:var(--text-muted);font-weight:600;">{{ s.suggested_multiplier }}×</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Score Distribution by Game</div>
+<div style="font-size:12px;color:var(--text-subtle);margin-bottom:12px;">
+  Each bar shows what % of submissions fell in each score range.
+  A bar heavy on the left (red) = hard; heavy on the right (green) = easy.
+</div>
+<div class="card" style="padding:16px;margin-bottom:32px;">
+  <div style="position:relative;height:{{ [game_stats | length * 40, 200] | max }}px;">
+    <canvas id="distChart"></canvas>
+  </div>
+</div>
+
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Average Score vs Reference ({{ reference_avg | int }})</div>
+<div class="card" style="padding:16px;margin-bottom:32px;">
+  <div style="position:relative;height:{{ [game_stats | length * 40, 200] | max }}px;">
+    <canvas id="avgChart"></canvas>
+  </div>
+</div>
+
+<div class="card" style="padding:16px;margin-bottom:24px;background:var(--c-warning-bg);border-color:var(--c-warning-border);">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--c-warning-text);margin-bottom:8px;">How to use this</div>
+  <p style="font-size:12px;color:var(--c-warning-text);margin:0;line-height:1.6;">
+    The suggested multipliers are a starting point based on historical averages.
+    To apply them, you would store a <code>difficulty_multiplier</code> per game and multiply
+    <code>base_score × multiplier</code> before adding speed bonuses.
+    Consider recalibrating periodically as more submissions come in, and check whether any games
+    have too few submissions to give a reliable estimate (look for small counts above).
+  </p>
+</div>
+
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const labels   = {{ chart_labels_json | safe }};
+  const datasets = {{ chart_datasets_json | safe }};
+  const refAvg   = {{ reference_avg }};
+  const avgScores = [{% for s in game_stats %}{{ s.avg_base_score }}{% if not loop.last %},{% endif %}{% endfor %}];
+
+  // Okabe-Ito palette for bucket colors (CB-safe: distinguishable for deuteranopia, protanopia, tritanopia)
+  // Normal: intuitive bad(blue) → good(warm) gradient using same palette
+  const BUCKET_COLORS_N  = ['#0072B2','#56B4E9','#E69F00','#F0E442','#009E73','#CC79A7'];
+  const BUCKET_COLORS_CB = ['#0072B2','#56B4E9','#E69F00','#F0E442','#009E73','#CC79A7'];
+
+  // Per-game bar colors (avg chart)
+  const GAME_COLORS_N  = ['#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2980b9','#c0392b','#1abc9c'];
+  const GAME_COLORS_CB = ['#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7','#009E73','#F0E442','#AA3377','#CCBB44','#44BB99'];
+
+  function isCB() {
+    return document.documentElement.getAttribute('data-cb') === 'deuteranopia';
+  }
+  function getBucketColors() { return isCB() ? BUCKET_COLORS_CB : BUCKET_COLORS_N; }
+  function getGameColors()   { return isCB() ? GAME_COLORS_CB   : GAME_COLORS_N;   }
+
+  function getStyle() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      text:   s.getPropertyValue('--text').trim()        || '#222',
+      subtle: s.getPropertyValue('--text-subtle').trim() || '#999',
+      border: s.getPropertyValue('--border').trim()      || '#ddd',
+    };
+  }
+
+  function applyBucketColors() {
+    const colors = getBucketColors();
+    datasets.forEach((ds, i) => { ds.backgroundColor = colors[i]; });
+  }
+
+  let distChart = null;
+  let avgChart  = null;
+
+  function buildDist() {
+    applyBucketColors();
+    const s = getStyle();
+    const opts = {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: s.text, boxWidth: 14, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x}%` } },
+      },
+      scales: {
+        x: {
+          stacked: true, max: 100,
+          title: { display: true, text: '% of submissions', color: s.subtle },
+          ticks: { color: s.subtle, callback: v => v + '%' },
+          grid: { color: s.border },
+        },
+        y: { stacked: true, ticks: { color: s.text }, grid: { color: s.border } },
+      },
+    };
+    if (distChart) {
+      distChart.options = opts;
+      distChart.update();
+    } else {
+      distChart = new Chart(document.getElementById('distChart').getContext('2d'), {
+        type: 'bar', data: { labels, datasets }, options: opts,
+      });
+    }
+  }
+
+  function buildAvg() {
+    const s = getStyle();
+    const colors = getGameColors();
+    const opts = {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` Avg base score: ${ctx.parsed.x}` } },
+      },
+      scales: {
+        x: {
+          min: 0, max: 100,
+          title: { display: true, text: 'Avg base score', color: s.subtle },
+          ticks: { color: s.subtle }, grid: { color: s.border },
+        },
+        y: { ticks: { color: s.text }, grid: { color: s.border } },
+      },
+    };
+    const dataset = {
+      label: 'Avg base score',
+      data: avgScores,
+      backgroundColor: avgScores.map((v, i) => colors[i % colors.length] + 'cc'),
+      borderColor:     avgScores.map((v, i) => colors[i % colors.length]),
+      borderWidth: 2,
+    };
+    if (avgChart) {
+      avgChart.data.datasets[0] = dataset;
+      avgChart.options = opts;
+      avgChart.update();
+    } else {
+      avgChart = new Chart(document.getElementById('avgChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets: [dataset] },
+        options: opts,
+        plugins: [{
+          id: 'refLine',
+          afterDraw(chart) {
+            const { ctx: c, scales: { x, y } } = chart;
+            const xPos = x.getPixelForValue(refAvg);
+            c.save();
+            c.beginPath();
+            c.moveTo(xPos, y.top);
+            c.lineTo(xPos, y.bottom);
+            c.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-primary').trim() || '#e0457a';
+            c.lineWidth = 2;
+            c.setLineDash([5, 4]);
+            c.stroke();
+            c.restore();
+          },
+        }],
+      });
+    }
+  }
+
+  function applyTheme() {
+    applyBucketColors();
+    if (distChart) {
+      const s = getStyle();
+      distChart.options.plugins.legend.labels.color = s.text;
+      distChart.options.scales.x.ticks.color  = s.subtle;
+      distChart.options.scales.x.grid.color   = s.border;
+      distChart.options.scales.y.ticks.color  = s.text;
+      distChart.options.scales.y.grid.color   = s.border;
+      distChart.update();
+    }
+    buildAvg();
+  }
+
+  document.addEventListener('themechange', applyTheme);
+
+  buildDist();
+  buildAvg();
+})();
+</script>
+{% endblock %}
