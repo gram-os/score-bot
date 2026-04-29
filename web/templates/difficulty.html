@@ -108,9 +108,22 @@
   const labels   = {{ chart_labels_json | safe }};
   const datasets = {{ chart_datasets_json | safe }};
   const refAvg   = {{ reference_avg }};
-
-  // per-game avg scores passed from server
   const avgScores = [{% for s in game_stats %}{{ s.avg_base_score }}{% if not loop.last %},{% endif %}{% endfor %}];
+
+  // Okabe-Ito palette for bucket colors (CB-safe: distinguishable for deuteranopia, protanopia, tritanopia)
+  // Normal: intuitive bad(blue) → good(warm) gradient using same palette
+  const BUCKET_COLORS_N  = ['#0072B2','#56B4E9','#E69F00','#F0E442','#009E73','#CC79A7'];
+  const BUCKET_COLORS_CB = ['#0072B2','#56B4E9','#E69F00','#F0E442','#009E73','#CC79A7'];
+
+  // Per-game bar colors (avg chart)
+  const GAME_COLORS_N  = ['#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2980b9','#c0392b','#1abc9c'];
+  const GAME_COLORS_CB = ['#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7','#009E73','#F0E442','#AA3377','#CCBB44','#44BB99'];
+
+  function isCB() {
+    return document.documentElement.getAttribute('data-cb') === 'deuteranopia';
+  }
+  function getBucketColors() { return isCB() ? BUCKET_COLORS_CB : BUCKET_COLORS_N; }
+  function getGameColors()   { return isCB() ? GAME_COLORS_CB   : GAME_COLORS_N;   }
 
   function getStyle() {
     const s = getComputedStyle(document.documentElement);
@@ -121,28 +134,28 @@
     };
   }
 
+  function applyBucketColors() {
+    const colors = getBucketColors();
+    datasets.forEach((ds, i) => { ds.backgroundColor = colors[i]; });
+  }
+
   let distChart = null;
   let avgChart  = null;
 
   function buildDist() {
+    applyBucketColors();
     const s = getStyle();
-    const ctx = document.getElementById('distChart').getContext('2d');
     const opts = {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { position: 'bottom', labels: { color: s.text, boxWidth: 14, padding: 12 } },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x}%`,
-          },
-        },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x}%` } },
       },
       scales: {
         x: {
-          stacked: true,
-          max: 100,
+          stacked: true, max: 100,
           title: { display: true, text: '% of submissions', color: s.subtle },
           ticks: { color: s.subtle, callback: v => v + '%' },
           grid: { color: s.border },
@@ -154,41 +167,32 @@
       distChart.options = opts;
       distChart.update();
     } else {
-      distChart = new Chart(ctx, { type: 'bar', data: { labels, datasets }, options: opts });
+      distChart = new Chart(document.getElementById('distChart').getContext('2d'), {
+        type: 'bar', data: { labels, datasets }, options: opts,
+      });
     }
   }
 
   function buildAvg() {
     const s = getStyle();
-    const ctx = document.getElementById('avgChart').getContext('2d');
-    const COLORS_N  = ['#4f6ef7','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2980b9','#c0392b','#1abc9c'];
-    const COLORS_CB = ['#0072B2','#D55E00','#E69F00','#56B4E9','#CC79A7','#009E73','#F0E442','#AA3377','#CCBB44','#44BB99'];
-    const colors = document.documentElement.getAttribute('data-cb') === 'deuteranopia' ? COLORS_CB : COLORS_N;
-
+    const colors = getGameColors();
     const opts = {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` Avg base score: ${ctx.parsed.x}`,
-          },
-        },
-        annotation: {},
+        tooltip: { callbacks: { label: ctx => ` Avg base score: ${ctx.parsed.x}` } },
       },
       scales: {
         x: {
           min: 0, max: 100,
           title: { display: true, text: 'Avg base score', color: s.subtle },
-          ticks: { color: s.subtle },
-          grid: { color: s.border },
+          ticks: { color: s.subtle }, grid: { color: s.border },
         },
         y: { ticks: { color: s.text }, grid: { color: s.border } },
       },
     };
-
     const dataset = {
       label: 'Avg base score',
       data: avgScores,
@@ -196,13 +200,12 @@
       borderColor:     avgScores.map((v, i) => colors[i % colors.length]),
       borderWidth: 2,
     };
-
     if (avgChart) {
       avgChart.data.datasets[0] = dataset;
       avgChart.options = opts;
       avgChart.update();
     } else {
-      avgChart = new Chart(ctx, {
+      avgChart = new Chart(document.getElementById('avgChart').getContext('2d'), {
         type: 'bar',
         data: { labels, datasets: [dataset] },
         options: opts,
@@ -227,7 +230,17 @@
   }
 
   function applyTheme() {
-    [distChart, avgChart].forEach(chart => { if (chart) chart.update(); });
+    applyBucketColors();
+    if (distChart) {
+      const s = getStyle();
+      distChart.options.plugins.legend.labels.color = s.text;
+      distChart.options.scales.x.ticks.color  = s.subtle;
+      distChart.options.scales.x.grid.color   = s.border;
+      distChart.options.scales.y.ticks.color  = s.text;
+      distChart.options.scales.y.grid.color   = s.border;
+      distChart.update();
+    }
+    buildAvg();
   }
 
   document.addEventListener('themechange', applyTheme);

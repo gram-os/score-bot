@@ -11,7 +11,6 @@ router = APIRouter()
 
 _REFERENCE_AVG = 50.0
 _BUCKET_LABELS = ["0–20", "20–40", "40–60", "60–80", "80–100", "100+"]
-_BUCKET_COLORS = ["#dc2626", "#d97706", "#ca8a04", "#65a30d", "#16a34a", "#0891b2"]
 
 
 def _build_chart_data(game_stats: list[GameAnalysisRow]) -> tuple[str, str]:
@@ -25,7 +24,6 @@ def _build_chart_data(game_stats: list[GameAnalysisRow]) -> tuple[str, str]:
                     round(s.distribution[i].count / s.submission_count * 100, 1) if s.submission_count > 0 else 0.0
                     for s in game_stats
                 ],
-                "backgroundColor": _BUCKET_COLORS[i],
             }
         )
     return json.dumps(labels), json.dumps(datasets)
