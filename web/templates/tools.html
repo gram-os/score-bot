@@ -155,6 +155,21 @@
 </div>
 
 <div class="tool-section">
+  <h3>Rebuild Streaks</h3>
+  <p class="tool-desc">
+    Wipes all streak records and replays every submission in chronological order to rebuild
+    current streaks, longest streaks, and freeze counts from scratch. Run this after
+    "Fix Submission Dates" to ensure streaks and freeze balances reflect the corrected
+    Eastern-time dates. Streak-based achievements (On Fire, Dedicated, Unstoppable) will
+    be re-evaluated on the next submission after streaks are rebuilt.
+  </p>
+  <form method="post" action="/admin/tools/rebuild-streaks"
+        onsubmit="return confirm('Wipe and rebuild all streak data from submission history? This cannot be undone.')">
+    <button type="submit" class="btn btn-primary">Rebuild Streaks</button>
+  </form>
+</div>
+
+<div class="tool-section">
   <h3>Bulk Delete Submissions</h3>
   <p class="tool-desc">Delete all submissions for a specific game on a specific date. This cannot be undone.</p>
   <form method="post" action="/admin/tools/bulk-delete"
@@ -169,6 +184,25 @@
       <input type="date" name="date" required>
       <button type="submit" class="btn btn-danger">Delete All</button>
     </div>
+  </form>
+</div>
+
+<div class="tool-section" style="border-color:var(--c-danger);">
+  <h3 style="color:var(--c-danger);">Full Reset</h3>
+  <p class="tool-desc">
+    Permanently deletes <strong>all</strong> submissions, streaks, achievements, and monthly rank
+    snapshots. Games, seasons, user preferences, and settings are preserved. Use this before a
+    complete Discord backfill to rebuild history from scratch with correct Eastern-time dates.
+    <br><br>
+    <strong>Step 1:</strong> Reset here. &nbsp;
+    <strong>Step 2:</strong> Run "Backfill from Discord" above for your full date range.
+  </p>
+  <form method="post" action="/admin/tools/reset-all">
+    <div class="tool-form-row" style="margin-bottom:10px;">
+      <label style="font-size:13px;">Type <code>RESET</code> to confirm:</label>
+      <input type="text" name="confirm" placeholder="RESET" autocomplete="off" style="width:120px;" required>
+    </div>
+    <button type="submit" class="btn btn-danger">Wipe All Data</button>
   </form>
 </div>
 {% endblock %}

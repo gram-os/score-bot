@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 from datetime import datetime, date, timezone
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import delete, distinct, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from bot.db.config import SCORING_TZ
-from bot.db.models import Submission, User
+from bot.db.models import MonthlyRankSnapshot, Submission, User, UserAchievement, UserStreak
 from bot.scoring import assign_submission_rank
 
 
@@ -205,3 +205,31 @@ def get_users_summary(session: Session) -> list[UserSummary]:
         )
         for row in rows
     ]
+
+
+@dataclass
+class ResetResult:
+    submissions_deleted: int
+    streaks_deleted: int
+    achievements_deleted: int
+    snapshots_deleted: int
+
+
+def reset_all_submissions(session: Session) -> ResetResult:
+    snapshots = session.scalar(select(func.count()).select_from(MonthlyRankSnapshot)) or 0
+    achievements = session.scalar(select(func.count()).select_from(UserAchievement)) or 0
+    streaks = session.scalar(select(func.count()).select_from(UserStreak)) or 0
+    submissions = session.scalar(select(func.count()).select_from(Submission)) or 0
+
+    session.execute(delete(MonthlyRankSnapshot))
+    session.execute(delete(UserAchievement))
+    session.execute(delete(UserStreak))
+    session.execute(delete(Submission))
+    session.flush()
+
+    return ResetResult(
+        submissions_deleted=submissions,
+        streaks_deleted=streaks,
+        achievements_deleted=achievements,
+        snapshots_deleted=snapshots,
+    )

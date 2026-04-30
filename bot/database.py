@@ -75,9 +75,11 @@ from bot.db.streaks import (
     get_user_total_freezes,
     get_weekly_digest,
     get_yesterday_digest,
+    rebuild_all_streaks,
     update_streak_on_submission,
 )
 from bot.db.submissions import (
+    ResetResult,
     UserSummary,
     add_submission_manual,
     bulk_delete_submissions,
@@ -86,6 +88,7 @@ from bot.db.submissions import (
     is_duplicate,
     recalculate_game_ranks,
     record_submission,
+    reset_all_submissions,
     upsert_user,
 )
 from bot.db.suggestions import (
@@ -161,6 +164,9 @@ __all__ = [
     "get_user_total_freezes",
     "get_weekly_digest",
     "get_yesterday_digest",
+    "rebuild_all_streaks",
+    "reset_all_submissions",
+    "ResetResult",
     "update_streak_on_submission",
     "get_current_season",
     "get_season_ending_yesterday",

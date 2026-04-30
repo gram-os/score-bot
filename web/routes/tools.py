@@ -7,7 +7,12 @@ import httpx
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
-from bot.database import backfill_monthly_rank_snapshots, bulk_delete_submissions
+from bot.database import (
+    backfill_monthly_rank_snapshots,
+    bulk_delete_submissions,
+    rebuild_all_streaks,
+    reset_all_submissions,
+)
 from bot.db.submissions import redate_submissions
 from bot.parsers.registry import all_parsers
 from web.backfill import process_messages
@@ -202,6 +207,63 @@ async def tools_backfill(
             "backfill_range": f"{start_date} → {end_date}",
         },
     )
+
+
+@router.post("/tools/reset-all")
+async def tools_reset_all(
+    request: Request,
+    confirm: str = Form(""),
+    admin_session: dict = Depends(require_admin),
+):
+    if confirm != "RESET":
+        request.session["flash"] = "Reset cancelled: confirmation text did not match."
+        return RedirectResponse(url="/admin/tools", status_code=303)
+
+    db = _db_session()
+    try:
+        result = reset_all_submissions(db)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    log.warning(
+        "Admin %s performed full reset: %d submissions, %d streaks, %d achievements, %d snapshots deleted",
+        admin_session["email"],
+        result.submissions_deleted,
+        result.streaks_deleted,
+        result.achievements_deleted,
+        result.snapshots_deleted,
+    )
+    request.session["flash"] = (
+        f"Full reset complete: {result.submissions_deleted} submissions, "
+        f"{result.streaks_deleted} streaks, {result.achievements_deleted} achievements, "
+        f"and {result.snapshots_deleted} rank snapshots deleted. "
+        "Run Backfill from Discord to repopulate."
+    )
+    return RedirectResponse(url="/admin/tools", status_code=303)
+
+
+@router.post("/tools/rebuild-streaks")
+async def tools_rebuild_streaks(
+    request: Request,
+    admin_session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        count = rebuild_all_streaks(db)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    log.info("Admin %s rebuilt streaks from %d submissions", admin_session["email"], count)
+    request.session["flash"] = f"Streak rebuild complete: replayed {count} submission(s)."
+    return RedirectResponse(url="/admin/tools", status_code=303)
 
 
 @router.post("/tools/redate-submissions")

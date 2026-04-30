@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import delete, distinct, func, select
 from sqlalchemy.orm import Session
 
+from bot.db.config import SCORING_TZ
 from bot.db.models import Game, Submission, User, UserStreak
 
 MAX_FREEZES = 3
@@ -12,7 +13,7 @@ MAX_FREEZES = 3
 def _is_streak_active(row: UserStreak) -> bool:
     if row.last_submission_date is None:
         return False
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(SCORING_TZ).date()
     return (today - row.last_submission_date).days <= 1
 
 
@@ -51,7 +52,7 @@ def get_user_streak(session: Session, user_id: str, game_id: str) -> "UserStreak
 
 
 def get_all_streaks(session: Session, game_id: str) -> list[tuple[str, str, int]]:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(SCORING_TZ).date()
     rows = session.execute(
         select(
             UserStreak.user_id,
@@ -138,7 +139,7 @@ class GameDigestData:
 
 
 def get_yesterday_digest(session: Session) -> list[GameDigestData]:
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date()
+    yesterday = (datetime.now(SCORING_TZ) - timedelta(days=1)).date()
     games = session.execute(select(Game).where(Game.enabled.is_(True))).scalars().all()
 
     results = []
@@ -200,7 +201,7 @@ class WeeklyDigestData:
 
 
 def get_weekly_digest(session: Session) -> WeeklyDigestData:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(SCORING_TZ).date()
     week_end = today - timedelta(days=today.weekday() + 1)
     week_start = week_end - timedelta(days=6)
 
@@ -271,3 +272,22 @@ def get_weekly_digest(session: Session) -> WeeklyDigestData:
         total_submissions=total_subs,
         unique_players=unique_players,
     )
+
+
+def rebuild_all_streaks(session: Session) -> int:
+    session.execute(delete(UserStreak))
+    session.flush()
+
+    submissions = session.scalars(
+        select(Submission).order_by(
+            Submission.user_id,
+            Submission.game_id,
+            Submission.date,
+            Submission.submitted_at,
+        )
+    ).all()
+
+    for sub in submissions:
+        update_streak_on_submission(session, sub.user_id, sub.game_id, sub.date)
+
+    return len(submissions)
