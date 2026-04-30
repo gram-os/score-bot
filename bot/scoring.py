@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from bot.db.models import Submission
+from bot.db.models import Game, Submission
 
 
 def calculate_speed_bonus(rank: int) -> int:
@@ -11,6 +11,9 @@ def calculate_speed_bonus(rank: int) -> int:
 
 
 def assign_submission_rank(session: Session, game_id: str, submission_date: date) -> None:
+    game = session.get(Game, game_id)
+    multiplier = game.difficulty_multiplier if game else 1.0
+
     submissions = session.scalars(
         select(Submission)
         .where(Submission.game_id == game_id, Submission.date == submission_date)
@@ -21,6 +24,6 @@ def assign_submission_rank(session: Session, game_id: str, submission_date: date
         bonus = calculate_speed_bonus(rank) if submission.base_score > 0 else 0
         submission.submission_rank = rank
         submission.speed_bonus = bonus
-        submission.total_score = submission.base_score + bonus
+        submission.total_score = round(submission.base_score * multiplier + bonus, 2)
 
     session.flush()
