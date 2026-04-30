@@ -1,10 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, date, timezone
 
 from sqlalchemy import distinct, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from bot.db.config import SCORING_TZ
 from bot.db.models import Submission, User
 from bot.scoring import assign_submission_rank
 
@@ -121,6 +122,52 @@ def recalculate_game_ranks(session: Session, game_id: str) -> int:
     for d in dates:
         assign_submission_rank(session, game_id, d)
     return len(dates)
+
+
+@dataclass
+class RedateResult:
+    fixed: int = 0
+    skipped: int = 0
+    skipped_details: list[str] = field(default_factory=list)
+
+
+def redate_submissions(session: Session) -> RedateResult:
+    result = RedateResult()
+    all_subs = session.scalars(select(Submission)).all()
+    affected_game_dates: set[tuple[str, date]] = set()
+
+    for sub in all_subs:
+        eastern_date = sub.submitted_at.replace(tzinfo=timezone.utc).astimezone(SCORING_TZ).date()
+        if eastern_date == sub.date:
+            continue
+
+        conflict = session.scalar(
+            select(func.count())
+            .select_from(Submission)
+            .where(
+                Submission.user_id == sub.user_id,
+                Submission.game_id == sub.game_id,
+                Submission.date == eastern_date,
+                Submission.id != sub.id,
+            )
+        )
+        if conflict:
+            result.skipped += 1
+            result.skipped_details.append(
+                f"{sub.username} / {sub.game_id}: {sub.date} → {eastern_date} (conflict)"
+            )
+            continue
+
+        affected_game_dates.add((sub.game_id, sub.date))
+        affected_game_dates.add((sub.game_id, eastern_date))
+        sub.date = eastern_date
+        result.fixed += 1
+
+    session.flush()
+    for game_id, d in affected_game_dates:
+        assign_submission_rank(session, game_id, d)
+
+    return result
 
 
 @dataclass

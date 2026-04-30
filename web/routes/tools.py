@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
 from bot.database import backfill_monthly_rank_snapshots, bulk_delete_submissions
+from bot.db.submissions import redate_submissions
 from bot.parsers.registry import all_parsers
 from web.backfill import process_messages
 from web.deps import _db_session, fetch_all_games, require_admin, templates
@@ -201,6 +202,34 @@ async def tools_backfill(
             "backfill_range": f"{start_date} → {end_date}",
         },
     )
+
+
+@router.post("/tools/redate-submissions")
+async def tools_redate_submissions(
+    request: Request,
+    admin_session: dict = Depends(require_admin),
+):
+    db = _db_session()
+    try:
+        result = redate_submissions(db)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    log.info(
+        "Admin %s ran submission redate: %d fixed, %d skipped",
+        admin_session["email"],
+        result.fixed,
+        result.skipped,
+    )
+    msg = f"Redate complete: {result.fixed} submission(s) updated to Eastern dates."
+    if result.skipped:
+        msg += f" {result.skipped} skipped due to conflicts."
+    request.session["flash"] = msg
+    return RedirectResponse(url="/admin/tools", status_code=303)
 
 
 @router.post("/tools/backfill-monthly-ranks")

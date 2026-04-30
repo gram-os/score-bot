@@ -14,7 +14,7 @@ from bot.database import (
     record_submission,
     update_streak_on_submission,
 )
-from bot.db.config import set_config
+from bot.db.config import SCORING_TZ, set_config
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ async def handle_message(
             if game is None or not game.enabled:
                 break
 
+            result.date = timestamp.astimezone(SCORING_TZ).date()
             duplicate = is_duplicate(session, result.user_id, result.game_id, result.date)
             if not duplicate:
                 game_name = game.name

@@ -1,6 +1,10 @@
+from zoneinfo import ZoneInfo
+
 from sqlalchemy.orm import Session
 
 from bot.db.models import AdminConfig
+
+SCORING_TZ = ZoneInfo("America/New_York")
 
 
 def get_config(session: Session, key: str, default: str = "") -> str:

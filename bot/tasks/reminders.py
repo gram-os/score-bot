@@ -5,12 +5,22 @@ import discord
 from sqlalchemy import select
 
 from bot.database import Game, get_opted_in_preferences, get_streak, is_duplicate
+from bot.db.config import SCORING_TZ
 
 log = logging.getLogger(__name__)
 
 
+async def send_cutoff_reminder(client: discord.Client, channel_id: int) -> None:
+    channel = client.get_channel(channel_id)
+    if channel is None:
+        log.warning("Cutoff reminder: channel %s not found", channel_id)
+        return
+    await channel.send("⏰ **1 hour left** to submit your scores for today!")
+    log.info("Sent daily cutoff reminder")
+
+
 async def send_streak_reminders(client: discord.Client, Session, channel_id: int) -> None:
-    today = datetime.datetime.now(datetime.timezone.utc).date()
+    today = datetime.datetime.now(SCORING_TZ).date()
 
     with Session() as session:
         prefs = get_opted_in_preferences(session)

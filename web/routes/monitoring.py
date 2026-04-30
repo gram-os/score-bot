@@ -4,7 +4,8 @@ from datetime import timezone
 from fastapi import APIRouter, Depends, Request
 
 from bot.database import get_logs, get_usage_events, get_usage_summary
-from web.deps import PAGE_SIZE, _db_session, build_page_url, get_display_tz, require_admin, templates
+from bot.db.config import SCORING_TZ
+from web.deps import PAGE_SIZE, _db_session, build_page_url, require_admin, templates
 
 router = APIRouter()
 
@@ -56,7 +57,7 @@ async def monitoring_view(
 
     db = _db_session()
     try:
-        tz = get_display_tz(db)
+        tz = SCORING_TZ
 
         if tab == "logs":
             rows, total = get_logs(
