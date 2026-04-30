@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from sqlalchemy.orm import Session
 
 from bot.db.models import AdminConfig
@@ -15,3 +17,13 @@ def set_config(session: Session, key: str, value: str) -> None:
     else:
         row.value = value
     session.commit()
+
+
+def get_scoring_tz(session: Session) -> ZoneInfo:
+    tz_name = get_config(session, "scoring_timezone", "") or get_config(
+        session, "display_timezone", "America/New_York"
+    )
+    try:
+        return ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, KeyError):
+        return ZoneInfo("America/New_York")

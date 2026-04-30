@@ -73,6 +73,7 @@ async def system_view(
     db = _db_session()
     try:
         display_timezone = get_config(db, "display_timezone", "America/New_York")
+        scoring_timezone = get_config(db, "scoring_timezone", display_timezone)
     finally:
         db.close()
     return templates.TemplateResponse(
@@ -81,6 +82,7 @@ async def system_view(
         {
             "active": "system",
             "display_timezone": display_timezone,
+            "scoring_timezone": scoring_timezone,
             "timezones": DISPLAY_TIMEZONES,
             "saved": bool(saved),
         },
@@ -91,15 +93,24 @@ async def system_view(
 async def system_config_update(
     request: Request,
     display_timezone: str = Form(...),
+    scoring_timezone: str = Form(...),
     session: dict = Depends(require_admin),
 ):
     valid_zones = {tz for tz, _ in DISPLAY_TIMEZONES}
     if display_timezone not in valid_zones:
         display_timezone = "America/New_York"
+    if scoring_timezone not in valid_zones:
+        scoring_timezone = display_timezone
     db = _db_session()
     try:
         set_config(db, "display_timezone", display_timezone)
+        set_config(db, "scoring_timezone", scoring_timezone)
     finally:
         db.close()
-    log.info("Admin %s updated config: display_timezone=%s", session["email"], display_timezone)
+    log.info(
+        "Admin %s updated config: display_timezone=%s scoring_timezone=%s",
+        session["email"],
+        display_timezone,
+        scoring_timezone,
+    )
     return RedirectResponse("/admin/system?saved=1", status_code=303)

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from bot.achievements import check_and_award_achievements
 from bot.database import Game, is_duplicate, record_submission, update_streak_on_submission
+from bot.db.config import get_scoring_tz
 from bot.parsers.registry import all_parsers
 
 
@@ -44,6 +45,7 @@ def process_messages(session: Session, messages: list[dict]) -> BackfillResult:
     result = BackfillResult(messages_scanned=len(messages))
     parsers = all_parsers()
     enabled_count = _enabled_game_count(session)
+    scoring_tz = get_scoring_tz(session)
 
     for msg in messages:
         if msg.get("author", {}).get("bot"):
@@ -63,6 +65,7 @@ def process_messages(session: Session, messages: list[dict]) -> BackfillResult:
                 result.errors.append(f"Parser {parser.game_id} matched but returned None for {username}")
                 break
 
+            parse_result.date = timestamp.astimezone(scoring_tz).date()
             game = session.get(Game, parse_result.game_id)
             if game is None or not game.enabled:
                 break

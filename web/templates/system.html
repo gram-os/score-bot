@@ -200,6 +200,14 @@
         {% endfor %}
       </select>
     </div>
+    <div class="filter-group" style="margin-bottom:0;">
+      <label>Scoring Timezone</label>
+      <select name="scoring_timezone" class="input" style="width:260px">
+        {% for tz_value, tz_label in timezones %}
+        <option value="{{ tz_value }}" {% if scoring_timezone == tz_value %}selected{% endif %}>{{ tz_label }} — {{ tz_value }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <button type="submit" class="btn btn-primary">Save</button>
   </form>
 </div>
