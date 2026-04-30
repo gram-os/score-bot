@@ -3,6 +3,7 @@ import logging
 import discord
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from discord import app_commands
 from discord.ext import tasks
 from sqlalchemy.orm import sessionmaker
@@ -125,6 +126,12 @@ class ScoreBot(discord.Client):
                 CronTrigger(day=1, hour=DIGEST_HOUR, minute=DIGEST_MINUTE),
                 replace_existing=True,
             )
+            self._scheduler.add_job(
+                self._send_season_launch_reminder,
+                DateTrigger(run_date="2026-05-01 00:00:00", timezone="America/New_York"),
+                id="season_1_launch_reminder",
+                replace_existing=True,
+            )
             self._scheduler.start()
             log.info("Digest scheduler started (fires at %02d:%02d local)", DIGEST_HOUR, DIGEST_MINUTE)
             log.info("Reminder scheduler started (fires at %02d:%02d local)", REMINDER_HOUR, REMINDER_MINUTE)
@@ -164,6 +171,22 @@ class ScoreBot(discord.Client):
 
     async def _send_monthly_wrapped(self) -> None:
         await monthly_wrapped.send_monthly_wrapped(self, self.Session)
+
+    async def _send_season_launch_reminder(self) -> None:
+        msg = (
+            "🚀 **Season 1 starts today!**\n"
+            "Reminder to merge the season launch branch:\n"
+            "`claude/season-1-launch-announcement-gEGZV`\n\n"
+            "Changes included:\n"
+            "• Difficulty multipliers applied to all games\n"
+            "• Connections reverse-solve bonus (+15 pts)"
+        )
+        for admin_id in ADMIN_DISCORD_IDS:
+            try:
+                user = await self.fetch_user(admin_id)
+                await user.send(msg)
+            except Exception:
+                log.warning("Failed to DM season launch reminder to admin %s", admin_id)
 
     async def on_app_command_error(
         self,
