@@ -56,9 +56,12 @@ from bot.db.monthly_stats import (
     backfill_monthly_rank_snapshots,
     get_monthly_active_user_ids,
     get_monthly_wrapped,
+    get_season_active_user_ids,
+    get_season_wrapped,
     month_bounds,
     monthly_report_already_sent,
     prev_month,
+    season_report_already_sent,
     snapshot_month,
 )
 from bot.db.personal_bests import PersonalBests, get_best_base_score, get_personal_bests
@@ -203,8 +206,11 @@ __all__ = [
     "backfill_monthly_rank_snapshots",
     "get_monthly_active_user_ids",
     "get_monthly_wrapped",
+    "get_season_active_user_ids",
+    "get_season_wrapped",
     "month_bounds",
     "monthly_report_already_sent",
     "prev_month",
+    "season_report_already_sent",
     "snapshot_month",
 ]

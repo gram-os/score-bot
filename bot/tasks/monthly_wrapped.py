@@ -4,16 +4,22 @@ import logging
 from datetime import datetime, timezone
 
 import discord
+from sqlalchemy import select
 
+from bot.db.models import Season
 from bot.db.monthly_stats import (
     MonthlyGameStat,
     MonthlyWrapped,
     get_monthly_active_user_ids,
     get_monthly_wrapped,
+    get_season_active_user_ids,
+    get_season_wrapped,
     monthly_report_already_sent,
     prev_month,
+    season_report_already_sent,
     snapshot_month,
 )
+from bot.db.seasons import get_season_ending_yesterday
 from bot.db.usage import log_usage_event
 
 log = logging.getLogger(__name__)
@@ -39,9 +45,9 @@ def _game_stats_value(game_stats: list[MonthlyGameStat]) -> str:
 
 
 def _format_wrapped_embed(w: MonthlyWrapped) -> discord.Embed:
-    month_name = calendar.month_name[w.month]
+    title_period = w.label or f"{calendar.month_name[w.month]} {w.year}"
     embed = discord.Embed(
-        title=f"📊 Your {month_name} {w.year} Wrapped",
+        title=f"📊 Your {title_period} Wrapped",
         color=discord.Color.blurple(),
     )
 
@@ -156,3 +162,62 @@ async def send_monthly_wrapped(client: discord.Client, Session) -> None:
     log.info(
         "Monthly wrapped: sent %d/%d for %d-%02d", sent, len(user_ids), year, month
     )
+
+
+async def send_season_wrapped(client: discord.Client, Session) -> None:
+    with Session() as session:
+        season = get_season_ending_yesterday(session)
+        if season is None:
+            return
+
+        prev_season = session.scalar(
+            select(Season)
+            .where(Season.end_date < season.start_date)
+            .order_by(Season.end_date.desc())
+        )
+
+        season_id = season.id
+        season_name = season.name
+        start_date = season.start_date
+        end_date = season.end_date
+        prev_start = prev_season.start_date if prev_season else None
+        prev_end = prev_season.end_date if prev_season else None
+        user_ids = get_season_active_user_ids(session, start_date, end_date)
+
+    log.info("Season wrapped (%s): %d eligible users", season_name, len(user_ids))
+    sent = 0
+
+    for user_id in user_ids:
+        with Session() as session:
+            if season_report_already_sent(session, user_id, season_id):
+                continue
+            wrapped = get_season_wrapped(
+                session, user_id, season_id, season_name,
+                start_date, end_date, prev_start, prev_end,
+            )
+            if not wrapped:
+                continue
+
+        embed = _format_wrapped_embed(wrapped)
+        username = wrapped.username
+        try:
+            discord_user = await client.fetch_user(int(user_id))
+            await discord_user.send(embed=embed)
+
+            with Session() as session:
+                log_usage_event(
+                    session,
+                    "season_report.sent",
+                    user_id,
+                    username,
+                    {"season_id": season_id},
+                )
+                session.commit()
+
+            sent += 1
+        except Exception:
+            log.warning("Season wrapped: could not DM user %s", user_id)
+
+        await asyncio.sleep(_DM_DELAY_SECONDS)
+
+    log.info("Season wrapped: sent %d/%d for %s", sent, len(user_ids), season_name)
