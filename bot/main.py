@@ -12,6 +12,7 @@ from bot.commands import (
     best,
     feedback,
     games,
+    halloffame,
     help,
     homunculus,
     leaderboard,
@@ -59,6 +60,7 @@ _COMMAND_MODULES = [
     homunculus,
     submitted,
     seasons,
+    halloffame,
 ]
 
 

@@ -4,6 +4,7 @@ import logging
 import discord
 from sqlalchemy import func, select
 
+from bot.config import SEASON_CHAMPION_ROLE_NAME
 from bot.database import (
     Submission,
     User,
@@ -14,6 +15,38 @@ from bot.database import (
 )
 
 log = logging.getLogger(__name__)
+
+
+async def _assign_champion_role(client: discord.Client, champion_user_id: str) -> None:
+    if not client.guilds:
+        return
+    guild = client.guilds[0]
+    role = discord.utils.get(guild.roles, name=SEASON_CHAMPION_ROLE_NAME)
+    if role is None:
+        try:
+            role = await guild.create_role(
+                name=SEASON_CHAMPION_ROLE_NAME,
+                color=discord.Color.gold(),
+                reason="Season Champion role created by ScoreBot",
+            )
+        except discord.Forbidden:
+            log.warning("Missing permissions to create Season Champion role")
+            return
+
+    for member in role.members:
+        try:
+            await member.remove_roles(role, reason="New season champion crowned")
+        except discord.Forbidden:
+            log.warning("Could not remove champion role from %s", member)
+
+    try:
+        champion_member = await guild.fetch_member(int(champion_user_id))
+        await champion_member.add_roles(role, reason="Season Champion")
+        log.info("Assigned Season Champion role to %s", champion_user_id)
+    except discord.NotFound:
+        log.warning("Champion %s not found in guild", champion_user_id)
+    except discord.Forbidden:
+        log.warning("Missing permissions to assign Season Champion role")
 
 
 async def send_daily_digest(channel: discord.TextChannel | None, Session) -> None:
@@ -76,7 +109,7 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
 
             if top_rows:
                 champion_row = top_rows[0]
-                newly_awarded = award_season_champion(session, champion_row.user_id, ended_season.id)
+                newly_awarded = award_season_champion(session, champion_row.user_id, ended_season.id, ended_season.name)
                 session.commit()
                 if newly_awarded:
                     season_champion_user_id = champion_row.user_id
@@ -114,6 +147,8 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
             )
         except Exception:
             log.warning("Could not DM season champion %s", season_champion_user_id)
+
+        await _assign_champion_role(client, season_champion_user_id)
 
     if data.total_submissions == 0:
         return
