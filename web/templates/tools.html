@@ -140,6 +140,21 @@
 </div>
 
 <div class="tool-section">
+  <h3>Fix Submission Dates</h3>
+  <p class="tool-desc">
+    Re-derives the scoring date for every submission from its recorded timestamp using the
+    Eastern timezone (America/New_York). Fixes submissions that were incorrectly bucketed
+    into the wrong day when dates were computed from raw UTC. Rankings are recalculated for
+    any affected days. Submissions that would conflict with an existing entry are skipped
+    and reported in the flash message.
+  </p>
+  <form method="post" action="/admin/tools/redate-submissions"
+        onsubmit="return confirm('Re-date all submissions to Eastern time? This will update date fields and recalculate rankings for affected days.')">
+    <button type="submit" class="btn btn-primary">Fix Submission Dates</button>
+  </form>
+</div>
+
+<div class="tool-section">
   <h3>Bulk Delete Submissions</h3>
   <p class="tool-desc">Delete all submissions for a specific game on a specific date. This cannot be undone.</p>
   <form method="post" action="/admin/tools/bulk-delete"
