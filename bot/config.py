@@ -18,6 +18,8 @@ HOMUNCULUS_CHANNEL_ID: int | None = int(_homunculus_channel) if _homunculus_chan
 _homunculus_author = os.environ.get("HOMUNCULUS_AUTHOR_ID", "")
 HOMUNCULUS_AUTHOR_ID: int | None = int(_homunculus_author) if _homunculus_author else None
 
+SEASON_CHAMPION_ROLE_NAME: str = os.environ.get("SEASON_CHAMPION_ROLE_NAME", "Season Champion")
+
 _DIGEST_TIME = os.environ.get("DIGEST_TIME", "09:00")
 _digest_hour, _digest_minute = (int(x) for x in _DIGEST_TIME.split(":"))
 DIGEST_HOUR: int = _digest_hour

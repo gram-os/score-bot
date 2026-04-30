@@ -5,7 +5,14 @@ import discord
 from discord import app_commands
 
 from bot.config import PERIOD_CHOICES, PERIOD_LABELS
-from bot.database import Game, get_all_streaks, get_current_season, get_leaderboard, log_usage_event
+from bot.database import (
+    Game,
+    get_all_streaks,
+    get_current_season,
+    get_leaderboard,
+    get_season_champion_user_ids,
+    log_usage_event,
+)
 from bot.helpers import game_autocomplete_choices, resolve_game_label
 
 log = logging.getLogger(__name__)
@@ -73,6 +80,7 @@ def _season_countdown(season) -> str | None:
 async def _build_per_game_embed(session, game_id: str, game_label: str) -> discord.Embed:
     embed = discord.Embed(title=f"Leaderboard — {game_label}", color=discord.Color.gold())
     streak_map = {uid: streak for uid, _, streak in get_all_streaks(session, game_id)}
+    champion_ids = get_season_champion_user_ids(session)
 
     current_season = get_current_season(session)
     periods = [
@@ -91,7 +99,8 @@ async def _build_per_game_embed(session, game_id: str, game_label: str) -> disco
             medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(row.rank, f"`#{row.rank}`")
             streak = streak_map.get(row.user_id, 0)
             streak_str = f" 🔥{streak}" if streak >= 1 else ""
-            lines.append(f"{medal} **{row.username}**{streak_str} — {row.total_score:.0f} pts")
+            crown = " 👑" if row.user_id in champion_ids else ""
+            lines.append(f"{medal} **{row.username}**{streak_str}{crown} — {row.total_score:.0f} pts")
         embed.add_field(name=period_label, value="\n".join(lines), inline=False)
 
     countdown = _season_countdown(current_season)
@@ -116,6 +125,7 @@ async def _build_single_period_embed(
     else:
         streak_map = {uid: streak for uid, _, streak in get_all_streaks(session, game_id)}
 
+    champion_ids = get_season_champion_user_ids(session)
     current_season = get_current_season(session)
     if period_value == "season":
         period_label = current_season.name if current_season else "Season"
@@ -133,8 +143,9 @@ async def _build_single_period_embed(
             medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(row.rank, f"`#{row.rank}`")
             streak = streak_map.get(row.user_id, 0)
             streak_str = f" 🔥{streak}" if streak >= 1 else ""
+            crown = " 👑" if row.user_id in champion_ids else ""
             lines.append(
-                f"{medal} **{row.username}**{streak_str} — {row.total_score:.0f} pts"
+                f"{medal} **{row.username}**{streak_str}{crown} — {row.total_score:.0f} pts"
                 f" ({row.submission_count} sub{'s' if row.submission_count != 1 else ''})"
             )
         embed.description = "\n".join(lines)
