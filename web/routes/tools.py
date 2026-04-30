@@ -7,7 +7,8 @@ import httpx
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
-from bot.database import backfill_monthly_rank_snapshots, bulk_delete_submissions, redate_submissions
+from bot.database import backfill_monthly_rank_snapshots, bulk_delete_submissions
+from bot.db.submissions import redate_submissions
 from bot.parsers.registry import all_parsers
 from web.backfill import process_messages
 from web.deps import _db_session, fetch_all_games, require_admin, templates

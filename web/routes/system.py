@@ -7,7 +7,7 @@ import psutil
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from web.deps import _db_session, require_admin, templates
+from web.deps import require_admin, templates
 
 log = logging.getLogger(__name__)
 router = APIRouter()

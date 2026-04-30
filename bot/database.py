@@ -78,7 +78,6 @@ from bot.db.streaks import (
     update_streak_on_submission,
 )
 from bot.db.submissions import (
-    RedateResult,
     UserSummary,
     add_submission_manual,
     bulk_delete_submissions,
@@ -87,7 +86,6 @@ from bot.db.submissions import (
     is_duplicate,
     recalculate_game_ranks,
     record_submission,
-    redate_submissions,
     upsert_user,
 )
 from bot.db.suggestions import (
