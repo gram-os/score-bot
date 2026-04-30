@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 from urllib.parse import urlencode
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import jwt
 from fastapi import Request
@@ -11,35 +10,7 @@ from jwt import PyJWKClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from bot.database import Game, get_config, get_engine
-
-DISPLAY_TIMEZONES = [
-    ("UTC", "UTC"),
-    ("America/New_York", "Eastern Time (ET)"),
-    ("America/Chicago", "Central Time (CT)"),
-    ("America/Denver", "Mountain Time (MT)"),
-    ("America/Los_Angeles", "Pacific Time (PT)"),
-    ("America/Anchorage", "Alaska Time (AKT)"),
-    ("Pacific/Honolulu", "Hawaii Time (HT)"),
-    ("America/Phoenix", "Arizona (MST, no DST)"),
-    ("Europe/London", "London (GMT/BST)"),
-    ("Europe/Paris", "Paris (CET/CEST)"),
-    ("Europe/Berlin", "Berlin (CET/CEST)"),
-    ("Asia/Tokyo", "Tokyo (JST)"),
-    ("Asia/Singapore", "Singapore (SGT)"),
-    ("Asia/Seoul", "Seoul (KST)"),
-    ("Asia/Shanghai", "Shanghai (CST)"),
-    ("Australia/Sydney", "Sydney (AEST/AEDT)"),
-]
-
-
-def get_display_tz(db: Session) -> ZoneInfo:
-    tz_name = get_config(db, "display_timezone", "America/New_York")
-    try:
-        return ZoneInfo(tz_name)
-    except (ZoneInfoNotFoundError, KeyError):
-        return ZoneInfo("America/New_York")
-
+from bot.database import Game, get_engine
 
 log = logging.getLogger(__name__)
 

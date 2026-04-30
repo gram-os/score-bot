@@ -114,6 +114,11 @@ class ScoreBot(discord.Client):
                 replace_existing=True,
             )
             self._scheduler.add_job(
+                self._send_cutoff_reminder,
+                CronTrigger(hour=23, minute=0, timezone="America/New_York"),
+                replace_existing=True,
+            )
+            self._scheduler.add_job(
                 self._send_monthly_wrapped,
                 CronTrigger(day=1, hour=DIGEST_HOUR, minute=DIGEST_MINUTE),
                 replace_existing=True,
@@ -151,6 +156,9 @@ class ScoreBot(discord.Client):
 
     async def _send_streak_reminders(self) -> None:
         await reminders.send_streak_reminders(self, self.Session, DISCORD_CHANNEL_ID)
+
+    async def _send_cutoff_reminder(self) -> None:
+        await reminders.send_cutoff_reminder(self, DISCORD_CHANNEL_ID)
 
     async def _send_monthly_wrapped(self) -> None:
         await monthly_wrapped.send_monthly_wrapped(self, self.Session)

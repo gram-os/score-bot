@@ -188,27 +188,4 @@
 })();
 </script>
 
-<div style="margin-top:32px;border-top:1px solid var(--border);padding-top:24px;">
-  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:16px;">Settings</div>
-  {% if saved %}<div class="flash" style="margin-bottom:16px;">Settings saved.</div>{% endif %}
-  <form method="post" action="/admin/system/config" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
-    <div class="filter-group" style="margin-bottom:0;">
-      <label>Display Timezone</label>
-      <select name="display_timezone" class="input" style="width:260px">
-        {% for tz_value, tz_label in timezones %}
-        <option value="{{ tz_value }}" {% if display_timezone == tz_value %}selected{% endif %}>{{ tz_label }} — {{ tz_value }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="filter-group" style="margin-bottom:0;">
-      <label>Scoring Timezone</label>
-      <select name="scoring_timezone" class="input" style="width:260px">
-        {% for tz_value, tz_label in timezones %}
-        <option value="{{ tz_value }}" {% if scoring_timezone == tz_value %}selected{% endif %}>{{ tz_label }} — {{ tz_value }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <button type="submit" class="btn btn-primary">Save</button>
-  </form>
-</div>
 {% endblock %}
