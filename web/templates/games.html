@@ -33,10 +33,7 @@
             {% if g.enabled %}Disable{% else %}Enable{% endif %}
           </button>
         </form>
-        <form method="post" action="/admin/games/{{ g.id }}/recalculate"
-              onsubmit="return confirm('Recalculate all speed bonuses for {{ g.name }}?')">
-          <button type="submit" class="btn btn-secondary">Recalculate</button>
-        </form>
+        <a href="/admin/games/{{ g.id }}" class="btn btn-secondary">Detail</a>
       </td>
     </tr>
     {% endfor %}

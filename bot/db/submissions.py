@@ -117,8 +117,18 @@ def bulk_delete_submissions(session: Session, game_id: str, submission_date: dat
     return count
 
 
-def recalculate_game_ranks(session: Session, game_id: str) -> int:
-    dates = session.scalars(select(Submission.date).where(Submission.game_id == game_id).distinct()).all()
+def recalculate_game_ranks(
+    session: Session,
+    game_id: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> int:
+    stmt = select(Submission.date).where(Submission.game_id == game_id)
+    if start_date is not None:
+        stmt = stmt.where(Submission.date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(Submission.date <= end_date)
+    dates = session.scalars(stmt.distinct()).all()
     for d in dates:
         assign_submission_rank(session, game_id, d)
     return len(dates)

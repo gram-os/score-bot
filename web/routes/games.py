@@ -1,4 +1,5 @@
 import logging
+from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -79,6 +80,7 @@ async def game_detail(
             "leaderboard": leaderboard,
             "streaks": streaks,
             "flash": flash,
+            "today": date_type.today().isoformat(),
         },
     )
 
@@ -120,21 +122,34 @@ async def game_detail_stats(
 async def game_recalculate(
     request: Request,
     game_id: str,
+    start_date: str = Form(...),
+    end_date: str = Form(...),
     session: dict = Depends(require_admin),
 ):
+    try:
+        start = date_type.fromisoformat(start_date)
+        end = date_type.fromisoformat(end_date)
+    except ValueError:
+        request.session["flash"] = "Invalid date range."
+        return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
+    if end < start:
+        request.session["flash"] = "End date must be on or after start date."
+        return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
     db = _db_session()
     try:
-        affected = recalculate_game_ranks(db, game_id)
+        affected = recalculate_game_ranks(db, game_id, start_date=start, end_date=end)
         db.commit()
     finally:
         db.close()
     log.info(
-        "Admin %s recalculated ranks for %s (%d date(s))",
+        "Admin %s recalculated ranks for %s (%d date(s), %s–%s)",
         session["email"],
         game_id,
         affected,
+        start,
+        end,
     )
-    request.session["flash"] = f"Recalculated scores across {affected} date(s)."
+    request.session["flash"] = f"Recalculated scores across {affected} date(s) ({start} → {end})."
     return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
 
 
@@ -174,17 +189,10 @@ async def game_set_multiplier(
         if not game:
             return RedirectResponse(url="/admin/games", status_code=302)
         game.difficulty_multiplier = round(multiplier, 4)
-        affected = recalculate_game_ranks(db, game_id)
         db.commit()
-        log.info(
-            "Admin %s set multiplier for %s to %.4f, recalculated %d date(s)",
-            session["email"],
-            game_id,
-            multiplier,
-            affected,
-        )
+        log.info("Admin %s set multiplier for %s to %.4f", session["email"], game_id, multiplier)
         request.session["flash"] = (
-            f"Multiplier set to {multiplier:.4g}× — recalculated scores across {affected} date(s)."
+            f"Multiplier set to {multiplier:.4g}×. Use Recalculate to apply to existing scores."
         )
     finally:
         db.close()
