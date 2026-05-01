@@ -27,6 +27,7 @@ class Game(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     url: Mapped[str | None] = mapped_column(String, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    difficulty_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     submissions: Mapped[list["Submission"]] = relationship("Submission", back_populates="game")

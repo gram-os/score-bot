@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from bot.parsers.connections import ConnectionsParser
+from bot.parsers.connections import ConnectionsParser, _REVERSE_BONUS
 
 USER_ID = "123456789"
 TIMESTAMP = datetime(2024, 1, 15, 12, 0, 0)
@@ -8,6 +8,10 @@ TIMESTAMP = datetime(2024, 1, 15, 12, 0, 0)
 CONNECTIONS_PERFECT = "Connections\nPuzzle #100\n🟨🟨🟨🟨\n🟩🟩🟩🟩\n🟦🟦🟦🟦\n🟪🟪🟪🟪"
 CONNECTIONS_TWO_MISSES = "Connections\nPuzzle #101\n🟨🟩🟦🟪\n🟩🟩🟩🟩\n🟨🟦🟨🟦\n🟦🟦🟦🟦\n🟨🟨🟨🟨\n🟪🟪🟪🟪"
 CONNECTIONS_FAILED = "Connections\nPuzzle #102\n🟨🟩🟦🟪\n🟩🟨🟦🟪\n🟦🟨🟩🟪\n🟪🟨🟩🟦\n🟨🟨🟨🟩"
+# Purple → Blue → Green → Yellow (hardest first, no misses)
+CONNECTIONS_REVERSE_CLEAN = "Connections\nPuzzle #103\n🟪🟪🟪🟪\n🟦🟦🟦🟦\n🟩🟩🟩🟩\n🟨🟨🟨🟨"
+# Purple → Blue → Green → Yellow with a miss before purple
+CONNECTIONS_REVERSE_WITH_MISS = "Connections\nPuzzle #104\n🟨🟩🟦🟪\n🟪🟪🟪🟪\n🟦🟦🟦🟦\n🟩🟩🟩🟩\n🟨🟨🟨🟨"
 
 
 class TestConnectionsParserCanParse:
@@ -67,3 +71,24 @@ class TestConnectionsParserParse:
         result = self.parser.parse(CONNECTIONS_PERFECT, USER_ID, TIMESTAMP)
         assert result is not None
         assert result.message_text == CONNECTIONS_PERFECT
+
+    def test_no_reverse_bonus_for_normal_order(self):
+        result = self.parser.parse(CONNECTIONS_PERFECT, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 100.0
+        assert result.raw_data["reverse_bonus"] is False
+
+    def test_reverse_clean_adds_bonus(self):
+        result = self.parser.parse(CONNECTIONS_REVERSE_CLEAN, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 100.0 + _REVERSE_BONUS
+        assert result.raw_data["reverse_bonus"] is True
+        assert result.raw_data["misses"] == 0
+
+    def test_reverse_with_miss_adds_bonus(self):
+        # 1 miss → 80 base, plus reverse bonus
+        result = self.parser.parse(CONNECTIONS_REVERSE_WITH_MISS, USER_ID, TIMESTAMP)
+        assert result is not None
+        assert result.base_score == 80.0 + _REVERSE_BONUS
+        assert result.raw_data["reverse_bonus"] is True
+        assert result.raw_data["misses"] == 1

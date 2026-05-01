@@ -8,9 +8,17 @@ _HEADER_PATTERN = re.compile(r"Connections\s*\nPuzzle #(\d+)", re.IGNORECASE)
 _COLOR_SQUARES = {"🟨", "🟩", "🟦", "🟪"}
 _ROW_PATTERN = re.compile(r"[🟨🟩🟦🟪]{4}")
 
+_REVERSE_ORDER = ["🟪🟪🟪🟪", "🟦🟦🟦🟦", "🟩🟩🟩🟩", "🟨🟨🟨🟨"]
+_REVERSE_BONUS = 15
+
 
 def _is_pure_row(row: str) -> bool:
     return len(set(row)) == 1
+
+
+def _is_reverse_solve(rows: list[str]) -> bool:
+    pure_rows = [r for r in rows if _is_pure_row(r)]
+    return pure_rows == _REVERSE_ORDER
 
 
 class ConnectionsParser(GameParser):
@@ -40,10 +48,9 @@ class ConnectionsParser(GameParser):
         if not rows:
             return None
 
-        # misses = rows where all 4 squares are not the same colour
-        # base_score = max(0, 100 - misses * 20)
         misses = sum(1 for row in rows if not _is_pure_row(row))
-        base_score = float(max(0, 100 - misses * 20))
+        reverse = _is_reverse_solve(rows)
+        base_score = float(max(0, 100 - misses * 20) + (_REVERSE_BONUS if reverse else 0))
 
         return ParseResult(
             game_id=self.game_id,
@@ -54,6 +61,7 @@ class ConnectionsParser(GameParser):
                 "puzzle_number": puzzle_number,
                 "misses": misses,
                 "rows_played": len(rows),
+                "reverse_bonus": reverse,
             },
             message_text=message,
         )
