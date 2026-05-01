@@ -27,7 +27,14 @@
     <label style="font-size:13px;color:var(--text-muted);">Difficulty ×</label>
     <input type="number" name="multiplier" value="{{ game.difficulty_multiplier }}" min="0.01" max="10" step="0.01"
            style="width:80px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:14px;" required>
-    <button type="submit" class="btn">Save &amp; Recalc</button>
+    <button type="submit" class="btn">Save</button>
+  </form>
+  <form method="post" action="/admin/games/{{ game.id }}/recalculate" style="display:flex;align-items:center;gap:8px;">
+    <label style="font-size:13px;color:var(--text-muted);">Recalculate</label>
+    <input type="date" name="start_date" class="input" style="width:140px;" required>
+    <span style="font-size:13px;color:var(--text-muted);">→</span>
+    <input type="date" name="end_date" class="input" style="width:140px;" value="{{ today }}" required>
+    <button type="submit" class="btn btn-secondary">Apply</button>
   </form>
 </div>
 
