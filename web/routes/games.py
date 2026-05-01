@@ -68,6 +68,7 @@ async def game_detail(
     finally:
         db.close()
 
+    flash = request.session.pop("flash", None)
     return templates.TemplateResponse(
         request,
         "game_detail.html",
@@ -77,6 +78,7 @@ async def game_detail(
             "metrics": metrics,
             "leaderboard": leaderboard,
             "streaks": streaks,
+            "flash": flash,
         },
     )
 
@@ -132,8 +134,8 @@ async def game_recalculate(
         game_id,
         affected,
     )
-    request.session["flash"] = f"Recalculated scores across {affected} date(s) for {game_id}."
-    return RedirectResponse(url="/admin/games", status_code=303)
+    request.session["flash"] = f"Recalculated scores across {affected} date(s)."
+    return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
 
 
 @router.post("/games/{game_id}/set-url")
@@ -151,6 +153,39 @@ async def game_set_url(
             db.commit()
             log.info("Admin %s set url for game %s to %s", session["email"], game_id, game.url)
             request.session["flash"] = f"URL updated for {game.name}."
+    finally:
+        db.close()
+    return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
+
+
+@router.post("/games/{game_id}/set-multiplier")
+async def game_set_multiplier(
+    request: Request,
+    game_id: str,
+    multiplier: float = Form(...),
+    session: dict = Depends(require_admin),
+):
+    if multiplier <= 0:
+        request.session["flash"] = "Multiplier must be greater than 0."
+        return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
+    db = _db_session()
+    try:
+        game = db.get(Game, game_id)
+        if not game:
+            return RedirectResponse(url="/admin/games", status_code=302)
+        game.difficulty_multiplier = round(multiplier, 4)
+        affected = recalculate_game_ranks(db, game_id)
+        db.commit()
+        log.info(
+            "Admin %s set multiplier for %s to %.4f, recalculated %d date(s)",
+            session["email"],
+            game_id,
+            multiplier,
+            affected,
+        )
+        request.session["flash"] = (
+            f"Multiplier set to {multiplier:.4g}× — recalculated scores across {affected} date(s)."
+        )
     finally:
         db.close()
     return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)

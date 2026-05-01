@@ -15,11 +15,21 @@
   {% endif %}
 </div>
 
-<form method="post" action="/admin/games/{{ game.id }}/set-url" style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
-  <input type="url" name="url" value="{{ game.url or '' }}" placeholder="https://example.com/game"
-         style="flex:1;max-width:400px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:14px;">
-  <button type="submit" class="btn">Save URL</button>
-</form>
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;">
+  <form method="post" action="/admin/games/{{ game.id }}/set-url" style="display:flex;align-items:center;gap:8px;">
+    <input type="url" name="url" value="{{ game.url or '' }}" placeholder="https://example.com/game"
+           style="width:320px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:14px;">
+    <button type="submit" class="btn">Save URL</button>
+  </form>
+  <form method="post" action="/admin/games/{{ game.id }}/set-multiplier" style="display:flex;align-items:center;gap:8px;">
+    <label style="font-size:13px;color:var(--text-muted);">Difficulty ×</label>
+    <input type="number" name="multiplier" value="{{ game.difficulty_multiplier }}" min="0.01" max="10" step="0.01"
+           style="width:80px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:14px;" required>
+    <button type="submit" class="btn">Save &amp; Recalc</button>
+  </form>
+</div>
 
 {% if metrics %}
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">

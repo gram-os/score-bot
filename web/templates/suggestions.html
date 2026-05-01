@@ -20,6 +20,10 @@
   .status-form button:hover { border-color: var(--c-primary); color: var(--c-primary); }
   .status-form button[data-status="accepted"]:hover { border-color: var(--c-success); color: var(--c-success); }
   .status-form button[data-status="rejected"]:hover  { border-color: var(--c-danger);  color: var(--c-danger); }
+
+  .promote-row td { background: color-mix(in srgb, var(--c-success) 6%, transparent); }
+  .promote-form { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+  .promote-form input { font-size:11px; padding:3px 6px; width:110px; }
 </style>
 
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
@@ -27,16 +31,19 @@
   <span class="text-muted" style="font-size:12px;">{{ suggestions|length }} total</span>
 </div>
 
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
 {% if suggestions %}
 <table>
   <thead>
     <tr>
-      <th>#</th><th>Date</th><th>User</th><th>Game</th><th>Description</th><th>Status</th><th>Update</th>
+      <th>#</th><th>Date</th><th>User</th><th>Game</th><th>Description</th><th>Status</th><th>Actions</th>
     </tr>
   </thead>
   <tbody>
     {% for s in suggestions %}
-    <tr>
+    <tr{% if s.status == 'accepted' %} class="promote-row"{% endif %}>
       <td class="text-subtle">{{ s.id }}</td>
       <td class="text-muted" style="white-space:nowrap;">{{ s.suggested_at }}</td>
       <td>{{ s.username }}</td>
@@ -54,6 +61,13 @@
           {% endif %}
           {% endfor %}
         </div>
+        {% if s.status == 'accepted' %}
+        <form method="post" action="/admin/suggestions/{{ s.id }}/promote" class="promote-form">
+          <input name="game_id" class="input" placeholder="game-id" required title="Lowercase slug, e.g. wordle">
+          <input name="game_name" class="input" placeholder="Display name" value="{{ s.game_name }}" required>
+          <button type="submit" class="btn btn-primary" style="font-size:11px;padding:3px 8px;">+ Create Game</button>
+        </form>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}

@@ -3,6 +3,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 
 from bot.db.models import Season, get_engine
 from bot.db.season_stats import (
@@ -36,6 +37,13 @@ def _parse_date(value: str) -> date | None:
         return date.fromisoformat(value)
     except (ValueError, TypeError):
         return None
+
+
+def _overlapping_season(db: SASession, start: date, end: date, exclude_id: int | None = None) -> Season | None:
+    stmt = select(Season).where(Season.start_date <= end, Season.end_date >= start)
+    if exclude_id is not None:
+        stmt = stmt.where(Season.id != exclude_id)
+    return db.execute(stmt).scalars().first()
 
 
 @router.get("/seasons")
@@ -108,6 +116,12 @@ async def season_create(request: Request, session: dict = Depends(require_admin)
 
     db = _db_session()
     try:
+        conflict = _overlapping_season(db, start, end)
+        if conflict:
+            return RedirectResponse(
+                f"/admin/seasons?error=Dates+overlap+with+existing+season+%22{conflict.name}%22",
+                status_code=302,
+            )
         db.add(Season(name=name, start_date=start, end_date=end))
         db.commit()
         log.info("Season created: %s (%s – %s) by %s", name, start, end, session.get("email"))
@@ -134,6 +148,12 @@ async def season_edit(request: Request, season_id: int, session: dict = Depends(
         s = db.get(Season, season_id)
         if not s:
             return RedirectResponse("/admin/seasons?error=Season+not+found", status_code=302)
+        conflict = _overlapping_season(db, start, end, exclude_id=season_id)
+        if conflict:
+            return RedirectResponse(
+                f"/admin/seasons/{season_id}?flash=Dates+overlap+with+existing+season+%22{conflict.name}%22",
+                status_code=302,
+            )
         s.name = name
         s.start_date = start
         s.end_date = end

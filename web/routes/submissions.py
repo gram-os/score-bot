@@ -42,7 +42,7 @@ async def submissions_list(
         count_stmt = select(func.count()).select_from(Submission)
         if filters_list:
             count_stmt = count_stmt.where(*filters_list)
-        total_count = db.scalar(count_stmt)
+        total_count = db.scalar(count_stmt) or 0
 
         data_stmt = select(Submission).order_by(Submission.submitted_at.desc())
         if filters_list:
