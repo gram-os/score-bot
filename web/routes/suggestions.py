@@ -87,9 +87,7 @@ async def promote_suggestion(
         if not suggestion:
             return RedirectResponse("/admin/suggestions?error=Suggestion+not+found", status_code=303)
         if db.get(Game, game_id):
-            return RedirectResponse(
-                f"/admin/suggestions?error=Game+ID+%22{game_id}%22+already+exists", status_code=303
-            )
+            return RedirectResponse(f"/admin/suggestions?error=Game+ID+%22{game_id}%22+already+exists", status_code=303)
         db.add(Game(id=game_id, name=game_name, enabled=True))
         suggestion.status = "accepted"
         db.commit()
