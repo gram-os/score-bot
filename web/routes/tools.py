@@ -17,7 +17,7 @@ from bot.db.submissions import redate_submissions
 from bot.parsers.registry import all_parsers
 from web.backfill import process_messages
 from web.deps import _db_session, fetch_all_games, require_admin, templates
-from web.discord_api import add_reaction, fetch_channel_messages
+from web.discord_api import add_reaction, fetch_channel_messages, fetch_message_by_id
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -45,6 +45,7 @@ async def tools_view(
             "message": "",
             "results": [],
             "backfill_result": None,
+            "single_backfill_result": None,
         },
     )
 
@@ -85,6 +86,7 @@ async def tools_parse_test(
             "message": message,
             "results": results,
             "backfill_result": None,
+            "single_backfill_result": None,
         },
     )
 
@@ -145,6 +147,7 @@ async def tools_backfill(
                 "message": "",
                 "results": [],
                 "backfill_result": None,
+                "single_backfill_result": None,
             },
         )
 
@@ -163,6 +166,7 @@ async def tools_backfill(
                 "message": "",
                 "results": [],
                 "backfill_result": None,
+                "single_backfill_result": None,
             },
         )
 
@@ -205,6 +209,84 @@ async def tools_backfill(
             "results": [],
             "backfill_result": backfill_result,
             "backfill_range": f"{start_date} → {end_date}",
+            "single_backfill_result": None,
+        },
+    )
+
+
+@router.post("/tools/backfill-message")
+async def tools_backfill_message(
+    request: Request,
+    message_id: str = Form(...),
+    admin_session: dict = Depends(require_admin),
+):
+    token = os.environ.get("DISCORD_TOKEN", "")
+    channel_id = int(os.environ.get("DISCORD_CHANNEL_ID", "0"))
+
+    db = _db_session()
+    try:
+        games = fetch_all_games(db)
+    finally:
+        db.close()
+
+    try:
+        msg = await fetch_message_by_id(token, channel_id, message_id.strip())
+    except httpx.HTTPStatusError as exc:
+        log.error("Discord API error fetching message %s: %s", message_id, exc)
+        return templates.TemplateResponse(
+            request,
+            "tools.html",
+            {
+                "active": "tools",
+                "games": games,
+                "flash": f"Discord API error: {exc.response.status_code} — message not found or bot lacks access.",
+                "tested": False,
+                "message": "",
+                "results": [],
+                "backfill_result": None,
+                "single_backfill_result": None,
+            },
+        )
+
+    db = _db_session()
+    try:
+        single_backfill_result = process_messages(db, [msg])
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    log.info(
+        "Admin %s backfilled single message %s: %d recorded, %d duplicates, %d errors",
+        admin_session["email"],
+        message_id,
+        len(single_backfill_result.recorded),
+        len(single_backfill_result.duplicates),
+        len(single_backfill_result.errors),
+    )
+
+    for row in single_backfill_result.recorded:
+        if row.message_id and row.reaction:
+            try:
+                await add_reaction(token, channel_id, row.message_id, row.reaction)
+            except Exception:
+                log.warning("Could not react to message %s", row.message_id)
+
+    return templates.TemplateResponse(
+        request,
+        "tools.html",
+        {
+            "active": "tools",
+            "games": games,
+            "flash": None,
+            "tested": False,
+            "message": "",
+            "results": [],
+            "backfill_result": None,
+            "single_backfill_result": single_backfill_result,
+            "single_message_id": message_id,
         },
     )
 
