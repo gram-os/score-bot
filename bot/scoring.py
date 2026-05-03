@@ -15,11 +15,7 @@ def calculate_speed_bonus(rank: int) -> int:
 
 def assign_submission_rank(session: Session, game_id: str, submission_date: date) -> None:
     game = session.get(Game, game_id)
-    multiplier = (
-        game.difficulty_multiplier
-        if game and submission_date >= _MULTIPLIER_EFFECTIVE_DATE
-        else 1.0
-    )
+    multiplier = game.difficulty_multiplier if game and submission_date >= _MULTIPLIER_EFFECTIVE_DATE else 1.0
 
     submissions = session.scalars(
         select(Submission)

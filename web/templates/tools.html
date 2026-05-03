@@ -127,6 +127,40 @@
 </div>
 
 <div class="tool-section">
+  <h3>Backfill Single Message</h3>
+  <p class="tool-desc">Recover a missed submission by its Discord message ID. Use this when a specific score wasn't recorded by the bot.</p>
+  <form method="post" action="/admin/tools/backfill-message">
+    <div class="tool-form-row">
+      <input type="text" name="message_id" placeholder="Discord message ID (e.g. 1500126391197372416)" style="width:320px;" required>
+      <button type="submit" class="btn btn-primary">Backfill</button>
+    </div>
+  </form>
+
+  {% if single_backfill_result is not none %}
+  <div style="margin-top:16px;">
+    {% set sbr = single_backfill_result %}
+    {% if sbr.recorded %}
+      <p style="font-size:13px;color:var(--c-success);">
+        ✓ Recorded <strong>{{ sbr.recorded[0].game_name }}</strong> for <strong>{{ sbr.recorded[0].username }}</strong>
+        on {{ sbr.recorded[0].date }} — score {{ sbr.recorded[0].base_score | int }}
+      </p>
+    {% elif sbr.duplicates %}
+      <p style="font-size:13px;color:var(--text-muted);">
+        Already recorded: <strong>{{ sbr.duplicates[0].game_name }}</strong> for <strong>{{ sbr.duplicates[0].username }}</strong>
+        on {{ sbr.duplicates[0].date }}.
+      </p>
+    {% elif sbr.errors %}
+      {% for err in sbr.errors %}
+      <p style="font-size:13px;color:var(--c-danger);">{{ err }}</p>
+      {% endfor %}
+    {% else %}
+      <p style="font-size:13px;color:var(--text-muted);">No parsers matched this message. The content may not be a recognised game score.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="tool-section">
   <h3>Monthly Rank Snapshot Backfill</h3>
   <p class="tool-desc">
     Computes and stores end-of-month leaderboard ranks for all historical months found in the

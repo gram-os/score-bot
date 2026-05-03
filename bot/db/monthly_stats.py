@@ -118,9 +118,7 @@ def _count_pbs_set(session: Session, user_id: str, subs, first: date) -> int:
     return count
 
 
-def _new_games_this_month(
-    session: Session, user_id: str, subs, first: date, last: date
-) -> list[str]:
+def _new_games_this_month(session: Session, user_id: str, subs, first: date, last: date) -> list[str]:
     game_ids = {s.game_id for s in subs}
     if not game_ids:
         return []
@@ -137,9 +135,7 @@ def _new_games_this_month(
     return [row.game_name for row in rows if first <= row.first_date <= last]
 
 
-def _achievements_in_range(
-    session: Session, user_id: str, start_dt: datetime, end_dt: datetime
-) -> int:
+def _achievements_in_range(session: Session, user_id: str, start_dt: datetime, end_dt: datetime) -> int:
     return (
         session.scalar(
             select(func.count(UserAchievement.id)).where(
@@ -152,9 +148,7 @@ def _achievements_in_range(
     )
 
 
-def _achievements_in_month(
-    session: Session, user_id: str, year: int, month: int, days_in_month: int
-) -> int:
+def _achievements_in_month(session: Session, user_id: str, year: int, month: int, days_in_month: int) -> int:
     start_dt = datetime(year, month, 1)
     end_dt = datetime(year, month, days_in_month, 23, 59, 59)
     return _achievements_in_range(session, user_id, start_dt, end_dt)
@@ -178,7 +172,9 @@ def _build_game_stats(
                     Submission.date >= prev_first,
                     Submission.date <= prev_last,
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
             if prev_first and prev_last
             else []
         )
@@ -198,9 +194,7 @@ def _build_game_stats(
     return sorted(result, key=lambda g: g.submissions, reverse=True)
 
 
-def _get_rank_snapshot(
-    session: Session, user_id: str, year: int, month: int
-) -> MonthlyRankSnapshot | None:
+def _get_rank_snapshot(session: Session, user_id: str, year: int, month: int) -> MonthlyRankSnapshot | None:
     return session.execute(
         select(MonthlyRankSnapshot).where(
             MonthlyRankSnapshot.user_id == user_id,
@@ -210,9 +204,7 @@ def _get_rank_snapshot(
     ).scalar_one_or_none()
 
 
-def get_monthly_wrapped(
-    session: Session, user_id: str, year: int, month: int
-) -> MonthlyWrapped | None:
+def get_monthly_wrapped(session: Session, user_id: str, year: int, month: int) -> MonthlyWrapped | None:
     first, last = month_bounds(year, month)
     subs = _fetch_month_subs(session, user_id, first, last)
     if not subs:
@@ -223,15 +215,17 @@ def get_monthly_wrapped(
     pf, pl = month_bounds(py, pm)
 
     avg_score = sum(s.base_score for s in subs) / len(subs)
-    prev_all = session.execute(
-        select(Submission.base_score).where(
-            Submission.user_id == user_id, Submission.date >= pf, Submission.date <= pl
+    prev_all = (
+        session.execute(
+            select(Submission.base_score).where(
+                Submission.user_id == user_id, Submission.date >= pf, Submission.date <= pl
+            )
         )
-    ).scalars().all()
-    prev_avg = sum(prev_all) / len(prev_all) if prev_all else None
-    score_delta_pct = (
-        round((avg_score - prev_avg) / prev_avg * 100, 1) if prev_avg else None
+        .scalars()
+        .all()
     )
+    prev_avg = sum(prev_all) / len(prev_all) if prev_all else None
+    score_delta_pct = round((avg_score - prev_avg) / prev_avg * 100, 1) if prev_avg else None
 
     best_sub = max(subs, key=lambda s: s.total_score)
     snap = _get_rank_snapshot(session, user_id, year, month)
@@ -266,11 +260,11 @@ def get_monthly_wrapped(
 
 def get_monthly_active_user_ids(session: Session, year: int, month: int) -> list[str]:
     first, last = month_bounds(year, month)
-    return session.execute(
-        select(distinct(Submission.user_id)).where(
-            Submission.date >= first, Submission.date <= last
-        )
-    ).scalars().all()
+    return (
+        session.execute(select(distinct(Submission.user_id)).where(Submission.date >= first, Submission.date <= last))
+        .scalars()
+        .all()
+    )
 
 
 def snapshot_month(session: Session, year: int, month: int) -> int:
@@ -280,9 +274,9 @@ def snapshot_month(session: Session, year: int, month: int) -> int:
     Returns the number of snapshot records inserted.
     """
     existing = session.scalar(
-        select(func.count()).select_from(MonthlyRankSnapshot).where(
-            MonthlyRankSnapshot.year == year, MonthlyRankSnapshot.month == month
-        )
+        select(func.count())
+        .select_from(MonthlyRankSnapshot)
+        .where(MonthlyRankSnapshot.year == year, MonthlyRankSnapshot.month == month)
     )
     if existing:
         return 0
@@ -352,44 +346,45 @@ def backfill_monthly_rank_snapshots(session: Session) -> SnapshotBackfillResult:
     )
 
 
-def monthly_report_already_sent(
-    session: Session, user_id: str, year: int, month: int
-) -> bool:
-    events = session.execute(
-        select(UsageEvent.event_data).where(
-            UsageEvent.event_type == "monthly_report.sent",
-            UsageEvent.user_id == user_id,
+def monthly_report_already_sent(session: Session, user_id: str, year: int, month: int) -> bool:
+    events = (
+        session.execute(
+            select(UsageEvent.event_data).where(
+                UsageEvent.event_type == "monthly_report.sent",
+                UsageEvent.user_id == user_id,
+            )
         )
-    ).scalars().all()
-    return any(
-        e is not None and e.get("year") == year and e.get("month") == month
-        for e in events
+        .scalars()
+        .all()
     )
+    return any(e is not None and e.get("year") == year and e.get("month") == month for e in events)
 
 
 def season_report_already_sent(session: Session, user_id: str, season_id: int) -> bool:
-    events = session.execute(
-        select(UsageEvent.event_data).where(
-            UsageEvent.event_type == "season_report.sent",
-            UsageEvent.user_id == user_id,
+    events = (
+        session.execute(
+            select(UsageEvent.event_data).where(
+                UsageEvent.event_type == "season_report.sent",
+                UsageEvent.user_id == user_id,
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return any(e is not None and e.get("season_id") == season_id for e in events)
 
 
-def get_season_active_user_ids(
-    session: Session, start_date: date, end_date: date
-) -> list[str]:
-    return session.execute(
-        select(distinct(Submission.user_id)).where(
-            Submission.date >= start_date, Submission.date <= end_date
+def get_season_active_user_ids(session: Session, start_date: date, end_date: date) -> list[str]:
+    return (
+        session.execute(
+            select(distinct(Submission.user_id)).where(Submission.date >= start_date, Submission.date <= end_date)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
 
-def _get_season_rank(
-    session: Session, user_id: str, start_date: date, end_date: date
-) -> tuple[int | None, int | None]:
+def _get_season_rank(session: Session, user_id: str, start_date: date, end_date: date) -> tuple[int | None, int | None]:
     rows = session.execute(
         select(Submission.user_id, func.sum(Submission.total_score).label("total"))
         .where(Submission.date >= start_date, Submission.date <= end_date)
@@ -427,7 +422,9 @@ def get_season_wrapped(
                 Submission.date >= prev_start,
                 Submission.date <= prev_end,
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
         if prev_start and prev_end
         else []
     )

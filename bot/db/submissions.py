@@ -163,9 +163,7 @@ def redate_submissions(session: Session) -> RedateResult:
         )
         if conflict:
             result.skipped += 1
-            result.skipped_details.append(
-                f"{sub.username} / {sub.game_id}: {sub.date} → {eastern_date} (conflict)"
-            )
+            result.skipped_details.append(f"{sub.username} / {sub.game_id}: {sub.date} → {eastern_date} (conflict)")
             continue
 
         affected_game_dates.add((sub.game_id, sub.date))

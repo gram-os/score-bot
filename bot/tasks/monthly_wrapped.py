@@ -35,11 +35,7 @@ def _score_delta_str(delta: float) -> str:
 def _game_stats_value(game_stats: list[MonthlyGameStat]) -> str:
     lines = []
     for g in game_stats:
-        delta = (
-            f" ({_score_delta_str(g.score_delta)} vs last mo.)"
-            if g.score_delta is not None
-            else ""
-        )
+        delta = f" ({_score_delta_str(g.score_delta)} vs last mo.)" if g.score_delta is not None else ""
         lines.append(f"**{g.game_name}**: {g.submissions}× · avg {g.avg_base_score:.0f}{delta}")
     return "\n".join(lines)
 
@@ -62,11 +58,7 @@ def _format_wrapped_embed(w: MonthlyWrapped) -> discord.Embed:
         embed.add_field(name="🎯 Ride-or-die", value=w.favorite_game_name, inline=True)
 
     if w.best_score is not None and w.best_score_game:
-        date_str = (
-            f" on {w.best_score_date.strftime('%b')} {w.best_score_date.day}"
-            if w.best_score_date
-            else ""
-        )
+        date_str = f" on {w.best_score_date.strftime('%b')} {w.best_score_date.day}" if w.best_score_date else ""
         embed.add_field(
             name="⚡ Best moment",
             value=f"{w.best_score:.0f} pts in {w.best_score_game}{date_str}",
@@ -124,9 +116,7 @@ async def send_monthly_wrapped(client: discord.Client, Session) -> None:
         session.commit()
         user_ids = get_monthly_active_user_ids(session, year, month)
 
-    log.info(
-        "Monthly wrapped: %d eligible users for %d-%02d", len(user_ids), year, month
-    )
+    log.info("Monthly wrapped: %d eligible users for %d-%02d", len(user_ids), year, month)
     sent = 0
 
     for user_id in user_ids:
@@ -159,9 +149,7 @@ async def send_monthly_wrapped(client: discord.Client, Session) -> None:
 
         await asyncio.sleep(_DM_DELAY_SECONDS)
 
-    log.info(
-        "Monthly wrapped: sent %d/%d for %d-%02d", sent, len(user_ids), year, month
-    )
+    log.info("Monthly wrapped: sent %d/%d for %d-%02d", sent, len(user_ids), year, month)
 
 
 async def send_season_wrapped(client: discord.Client, Session) -> None:
@@ -171,9 +159,7 @@ async def send_season_wrapped(client: discord.Client, Session) -> None:
             return
 
         prev_season = session.scalar(
-            select(Season)
-            .where(Season.end_date < season.start_date)
-            .order_by(Season.end_date.desc())
+            select(Season).where(Season.end_date < season.start_date).order_by(Season.end_date.desc())
         )
 
         season_id = season.id
@@ -192,8 +178,14 @@ async def send_season_wrapped(client: discord.Client, Session) -> None:
             if season_report_already_sent(session, user_id, season_id):
                 continue
             wrapped = get_season_wrapped(
-                session, user_id, season_id, season_name,
-                start_date, end_date, prev_start, prev_end,
+                session,
+                user_id,
+                season_id,
+                season_name,
+                start_date,
+                end_date,
+                prev_start,
+                prev_end,
             )
             if not wrapped:
                 continue

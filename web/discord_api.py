@@ -31,6 +31,18 @@ def snowflake_to_datetime(snowflake: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
 
 
+async def fetch_message_by_id(token: str, channel_id: int, message_id: str) -> dict:
+    """Fetch a single Discord message by its ID."""
+    headers = {"Authorization": f"Bot {token}"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def fetch_channel_messages(
     token: str,
     channel_id: int,

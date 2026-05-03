@@ -191,9 +191,7 @@ async def game_set_multiplier(
         game.difficulty_multiplier = round(multiplier, 4)
         db.commit()
         log.info("Admin %s set multiplier for %s to %.4f", session["email"], game_id, multiplier)
-        request.session["flash"] = (
-            f"Multiplier set to {multiplier:.4g}×. Use Recalculate to apply to existing scores."
-        )
+        request.session["flash"] = f"Multiplier set to {multiplier:.4g}×. Use Recalculate to apply to existing scores."
     finally:
         db.close()
     return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)

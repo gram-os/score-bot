@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 
+from zoneinfo import ZoneInfo
+
 from bot.database import (
     Game,
     Submission,
@@ -242,9 +244,12 @@ class TestGetLeaderboard:
 # ---------------------------------------------------------------------------
 
 
+_SCORING_TZ = ZoneInfo("America/New_York")
+
+
 def _add(session, user_id, username, days_ago, game_id="wordle"):
     upsert_user(session, user_id, username)
-    target_date = datetime.now(timezone.utc).date() - timedelta(days=days_ago)
+    target_date = datetime.now(_SCORING_TZ).date() - timedelta(days=days_ago)
     sub = Submission(
         user_id=user_id,
         username=username,
