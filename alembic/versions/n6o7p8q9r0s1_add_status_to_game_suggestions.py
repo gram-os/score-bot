@@ -22,9 +22,7 @@ def upgrade() -> None:
         "game_suggestions",
         sa.Column("status", sa.String(), nullable=False, server_default="pending"),
     )
-    op.execute(
-        "UPDATE game_suggestions SET status = 'polled' WHERE poll_id IS NOT NULL"
-    )
+    op.execute("UPDATE game_suggestions SET status = 'polled' WHERE poll_id IS NOT NULL")
 
 
 def downgrade() -> None:

@@ -92,11 +92,7 @@ def _seed_seasons() -> None:
 
 def _backfill_streaks() -> None:
     bind = op.get_bind()
-    result = bind.execute(
-        sa.text(
-            "SELECT user_id, game_id, date FROM submissions ORDER BY user_id, game_id, date"
-        )
-    )
+    result = bind.execute(sa.text("SELECT user_id, game_id, date FROM submissions ORDER BY user_id, game_id, date"))
 
     user_game_dates: dict[tuple[str, str], list[date]] = defaultdict(list)
     for row in result:

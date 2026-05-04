@@ -29,9 +29,12 @@ class MiniCrosswordParser(GameParser):
 
         minutes = int(m.group(1))
         seconds = int(m.group(2))
+        if minutes < 0 or not 0 <= seconds < 60:
+            return None
         total_seconds = minutes * 60 + seconds
+        if total_seconds < 0:
+            return None
 
-        # base_score = max(0, 100 - total_seconds): faster = higher score, capped at 0
         base_score = float(max(0, 100 - total_seconds))
 
         return ParseResult(

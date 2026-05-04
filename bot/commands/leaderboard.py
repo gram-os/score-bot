@@ -35,6 +35,8 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
         show_all_periods = game_id != "all" and period is None
         period_value = period.value if period else "alltime"
 
+        await interaction.response.defer()
+
         with Session() as session:
             if show_all_periods:
                 embed = await _build_per_game_embed(session, game_id, game_label)
@@ -55,7 +57,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             game_id,
             period_value if not show_all_periods else "all",
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @leaderboard.autocomplete("game")
     async def leaderboard_game_autocomplete(

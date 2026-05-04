@@ -21,9 +21,7 @@ def upgrade() -> None:
     op.create_table(
         "user_preferences",
         sa.Column("user_id", sa.String(), nullable=False),
-        sa.Column(
-            "remind_streak_days", sa.Integer(), nullable=False, server_default="0"
-        ),
+        sa.Column("remind_streak_days", sa.Integer(), nullable=False, server_default="0"),
         sa.PrimaryKeyConstraint("user_id"),
     )
 

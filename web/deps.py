@@ -42,8 +42,13 @@ def _get_jwks_client() -> PyJWKClient:
         cf_team_domain = os.environ.get("CF_TEAM_DOMAIN", "")
         if not cf_team_domain:
             raise RuntimeError("CF_TEAM_DOMAIN must be set")
-        _jwks_client = PyJWKClient(f"{cf_team_domain}/cdn-cgi/access/certs", cache_keys=True)
+        _jwks_client = PyJWKClient(f"{cf_team_domain}/cdn-cgi/access/certs", cache_keys=True, lifespan=300)
     return _jwks_client
+
+
+def _reset_jwks_client() -> None:
+    global _jwks_client
+    _jwks_client = None
 
 
 def _admin_emails() -> set[str]:
@@ -61,21 +66,36 @@ def _db_session() -> Session:
     return Session(engine)
 
 
+async def _fetch_signing_key(token: str) -> object:
+    client = _get_jwks_client()
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, client.get_signing_key_from_jwt, token)
+
+
 async def verify_cf_jwt(token: str) -> dict:
     cf_aud = os.environ.get("CF_AUD", "")
     cf_team_domain = os.environ.get("CF_TEAM_DOMAIN", "")
     if not cf_aud or not cf_team_domain:
         raise RuntimeError("CF_AUD and CF_TEAM_DOMAIN must be set")
-    client = _get_jwks_client()
-    loop = asyncio.get_event_loop()
-    signing_key = await loop.run_in_executor(None, client.get_signing_key_from_jwt, token)
-    return jwt.decode(
-        token,
-        signing_key.key,
-        algorithms=["RS256"],
-        audience=cf_aud,
-        issuer=cf_team_domain,
-    )
+    signing_key = await _fetch_signing_key(token)
+    try:
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=cf_aud,
+            issuer=cf_team_domain,
+        )
+    except jwt.InvalidSignatureError:
+        _reset_jwks_client()
+        signing_key = await _fetch_signing_key(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=cf_aud,
+            issuer=cf_team_domain,
+        )
 
 
 async def require_admin(request: Request) -> dict:
@@ -84,7 +104,7 @@ async def require_admin(request: Request) -> dict:
         raise NotAuthenticated()
     try:
         payload = await verify_cf_jwt(token)
-    except Exception as e:
+    except jwt.PyJWTError as e:
         log.warning("CF JWT verification failed for admin route: %s", e)
         raise NotAuthenticated()
     email = payload.get("email", "").lower()
@@ -102,7 +122,7 @@ async def require_homunculus_access(request: Request) -> dict:
         raise NotAuthenticated()
     try:
         payload = await verify_cf_jwt(token)
-    except Exception as e:
+    except jwt.PyJWTError as e:
         log.warning("CF JWT verification failed for homunculus route: %s", e)
         raise NotAuthenticated()
     email = payload.get("email", "").lower()
