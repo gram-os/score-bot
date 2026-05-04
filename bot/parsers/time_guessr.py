@@ -30,6 +30,8 @@ class TimeGuessrParser(GameParser):
 
         puzzle_number = int(m.group(1))
         raw_score = int(m.group(2).replace(",", ""))
+        if not 0 <= raw_score <= 50_000:
+            return None
         base_score = float(math.ceil(raw_score * 100 / 50_000))
 
         return ParseResult(

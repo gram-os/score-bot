@@ -97,3 +97,6 @@ class TestTimeGuessrParserParse:
 
     def test_returns_none_for_unrecognised(self):
         assert self.parser.parse("unrelated message", USER_ID, TIMESTAMP) is None
+
+    def test_returns_none_for_score_above_max(self):
+        assert self.parser.parse("TimeGuessr #1 60,000/50,000", USER_ID, TIMESTAMP) is None
