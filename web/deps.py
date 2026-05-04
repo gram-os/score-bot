@@ -84,7 +84,7 @@ async def require_admin(request: Request) -> dict:
         raise NotAuthenticated()
     try:
         payload = await verify_cf_jwt(token)
-    except Exception as e:
+    except jwt.PyJWTError as e:
         log.warning("CF JWT verification failed for admin route: %s", e)
         raise NotAuthenticated()
     email = payload.get("email", "").lower()
@@ -102,7 +102,7 @@ async def require_homunculus_access(request: Request) -> dict:
         raise NotAuthenticated()
     try:
         payload = await verify_cf_jwt(token)
-    except Exception as e:
+    except jwt.PyJWTError as e:
         log.warning("CF JWT verification failed for homunculus route: %s", e)
         raise NotAuthenticated()
     email = payload.get("email", "").lower()
