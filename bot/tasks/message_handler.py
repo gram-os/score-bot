@@ -18,6 +18,12 @@ from bot.db.config import SCORING_TZ, set_config
 
 log = logging.getLogger(__name__)
 
+STREAK_MILESTONES: frozenset[int] = frozenset({7, 14, 30, 60, 100})
+
+
+def _streak_milestone_hit(streak: int) -> int | None:
+    return streak if streak in STREAK_MILESTONES else None
+
 
 async def handle_message(
     client: discord.Client,
@@ -139,6 +145,22 @@ async def handle_message(
                         f"**{streak}-day streak** in **{game_name}**! "
                         f"You have {user_streak.freeze_count} freeze"
                         f"{'s' if user_streak.freeze_count != 1 else ''} remaining.",
+                    )
+
+                milestone = _streak_milestone_hit(streak)
+                if milestone is not None:
+                    log_usage_event(
+                        session,
+                        "feature.streak_milestone",
+                        result.user_id,
+                        username,
+                        {"game_id": result.game_id, "milestone": milestone},
+                    )
+                    session.commit()
+                    await _dm_user(
+                        client,
+                        result.user_id,
+                        f"🔥 **{username}** hit a **{milestone}-day streak** in **{game_name}**! Keep it going.",
                     )
 
                 for slug in new_achievements:
