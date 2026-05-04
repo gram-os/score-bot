@@ -57,3 +57,9 @@ class TestMiniCrosswordParserParse:
 
     def test_returns_none_for_unrecognised(self):
         assert self.parser.parse("unrelated message", USER_ID, TIMESTAMP) is None
+
+    def test_returns_none_for_seconds_at_60(self):
+        assert self.parser.parse("I solved the Mini in 1:60!", USER_ID, TIMESTAMP) is None
+
+    def test_returns_none_for_negative_minutes(self):
+        assert self.parser.parse("I solved the Mini in -1:30!", USER_ID, TIMESTAMP) is None
