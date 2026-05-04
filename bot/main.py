@@ -200,8 +200,8 @@ class ScoreBot(discord.Client):
             try:
                 user = await self.fetch_user(admin_id)
                 await user.send(dm)
-            except Exception:
-                log.warning("Failed to DM admin %s", admin_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                log.exception("Failed to DM admin %s", admin_id)
 
     async def on_message(self, message: discord.Message) -> None:
         await message_handler.handle_message(self, message, self.registry, self.Session, DISCORD_CHANNEL_ID)
