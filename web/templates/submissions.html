@@ -59,7 +59,7 @@
       <td>+{{ s.speed_bonus }}</td>
       <td><strong>{{ s.total_score | int }}</strong></td>
       <td>{{ s.submission_rank }}</td>
-      <td>{{ s.submitted_at.strftime('%Y-%m-%d %H:%M') if s.submitted_at else '' }}</td>
+      <td>{{ s.submitted_at | to_et }}</td>
       <td>
         <form method="post" action="/admin/submissions/{{ s.id }}/delete"
               onsubmit="return confirm('Delete this submission?')">

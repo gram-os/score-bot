@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import jwt
@@ -11,10 +12,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from bot.database import Game, get_engine
+from bot.db.config import SCORING_TZ
 
 log = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory="web/templates")
+
+
+def _to_et(dt: datetime | None) -> str:
+    if dt is None:
+        return ""
+    return dt.replace(tzinfo=timezone.utc).astimezone(SCORING_TZ).strftime("%Y-%m-%d %H:%M ET")
+
+
+templates.env.filters["to_et"] = _to_et
+
 PAGE_SIZE = 50
 
 _jwks_client: PyJWKClient | None = None
