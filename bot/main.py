@@ -102,17 +102,22 @@ class ScoreBot(discord.Client):
         if not self._scheduler.running:
             self._scheduler.add_job(
                 self._send_daily_digest,
-                CronTrigger(hour=DIGEST_HOUR, minute=DIGEST_MINUTE),
+                CronTrigger(hour=DIGEST_HOUR, minute=DIGEST_MINUTE, timezone="America/New_York"),
                 replace_existing=True,
             )
             self._scheduler.add_job(
                 self._send_weekly_digest,
-                CronTrigger(day_of_week="mon", hour=DIGEST_HOUR, minute=DIGEST_MINUTE),
+                CronTrigger(
+                    day_of_week="mon",
+                    hour=DIGEST_HOUR,
+                    minute=DIGEST_MINUTE,
+                    timezone="America/New_York",
+                ),
                 replace_existing=True,
             )
             self._scheduler.add_job(
                 self._send_streak_reminders,
-                CronTrigger(hour=REMINDER_HOUR, minute=REMINDER_MINUTE),
+                CronTrigger(hour=REMINDER_HOUR, minute=REMINDER_MINUTE, timezone="America/New_York"),
                 replace_existing=True,
             )
             self._scheduler.add_job(
@@ -122,7 +127,7 @@ class ScoreBot(discord.Client):
             )
             self._scheduler.add_job(
                 self._send_season_wrapped,
-                CronTrigger(hour=DIGEST_HOUR, minute=DIGEST_MINUTE),
+                CronTrigger(hour=DIGEST_HOUR, minute=DIGEST_MINUTE, timezone="America/New_York"),
                 replace_existing=True,
             )
             self._scheduler.start()
