@@ -1,10 +1,11 @@
 import logging
-from datetime import date
+from datetime import datetime
 
 import discord
 from discord import app_commands
 from sqlalchemy import select
 
+from bot.db.config import SCORING_TZ
 from bot.db.models import Game, Submission
 
 log = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def format_submission_line(game_name: str, submission: Submission) -> str:
 
 
 def get_today_submissions(session, user_id: str) -> list[tuple[str, Submission]]:
-    today = date.today()
+    today = datetime.now(SCORING_TZ).date()
     rows = session.execute(
         select(Submission, Game)
         .join(Game, Submission.game_id == Game.id)
