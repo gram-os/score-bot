@@ -28,9 +28,7 @@ def upgrade() -> None:
         sa.column("key", sa.String),
         sa.column("value", sa.String),
     )
-    op.bulk_insert(
-        config_table, [{"key": "display_timezone", "value": "America/New_York"}]
-    )
+    op.bulk_insert(config_table, [{"key": "display_timezone", "value": "America/New_York"}])
 
 
 def downgrade() -> None:

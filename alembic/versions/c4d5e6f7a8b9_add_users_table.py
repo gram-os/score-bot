@@ -26,12 +26,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("user_id"),
     )
     # Backfill from submissions: most recent username per user_id
-    op.get_bind().execute(sa.text("""
+    op.get_bind().execute(
+        sa.text("""
         INSERT INTO users (user_id, username, updated_at)
         SELECT user_id, username, MAX(submitted_at)
         FROM submissions
         GROUP BY user_id
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:

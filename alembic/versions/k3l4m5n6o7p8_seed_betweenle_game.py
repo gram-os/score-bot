@@ -23,8 +23,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     conn.execute(
         sa.text(
-            "INSERT OR IGNORE INTO games (id, name, enabled, created_at) "
-            "VALUES (:id, :name, :enabled, :created_at)"
+            "INSERT OR IGNORE INTO games (id, name, enabled, created_at) VALUES (:id, :name, :enabled, :created_at)"
         ),
         {
             "id": "betweenle",

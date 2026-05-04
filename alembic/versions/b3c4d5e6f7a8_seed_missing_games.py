@@ -39,6 +39,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DELETE FROM games WHERE id IN ('connections', 'mini_crossword', 'quordle', 'glyph', 'enclose_horse')"
-    )
+    op.execute("DELETE FROM games WHERE id IN ('connections', 'mini_crossword', 'quordle', 'glyph', 'enclose_horse')")
