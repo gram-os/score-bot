@@ -15,6 +15,7 @@ from bot.database import (
     get_game_speed_bonus_stats,
     get_leaderboard,
     get_score_distribution,
+    preview_recalculate_game_ranks,
     recalculate_game_ranks,
 )
 from web.deps import _db_session, fetch_all_games, require_admin, templates
@@ -118,23 +119,79 @@ async def game_detail_stats(
     )
 
 
+def _parse_recalc_range(start_date: str, end_date: str) -> tuple[date_type, date_type] | None:
+    try:
+        start = date_type.fromisoformat(start_date)
+        end = date_type.fromisoformat(end_date)
+    except ValueError:
+        return None
+    if end < start:
+        return None
+    return start, end
+
+
+def _preview_url(game_id: str, start: date_type, end: date_type) -> str:
+    return f"/admin/games/{game_id}/recalculate/preview?start={start.isoformat()}&end={end.isoformat()}"
+
+
+@router.get("/games/{game_id}/recalculate/preview")
+async def game_recalculate_preview(
+    request: Request,
+    game_id: str,
+    start: str,
+    end: str,
+    session: dict = Depends(require_admin),
+):
+    parsed = _parse_recalc_range(start, end)
+    if parsed is None:
+        request.session["flash"] = "Invalid date range."
+        return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
+    start_date, end_date = parsed
+    db = _db_session()
+    try:
+        game = db.get(Game, game_id)
+        if not game:
+            return RedirectResponse(url="/admin/games", status_code=302)
+        diffs = preview_recalculate_game_ranks(db, game_id, start_date=start_date, end_date=end_date)
+    finally:
+        db.close()
+
+    diffs_by_date: dict[date_type, list] = {}
+    for diff in diffs:
+        diffs_by_date.setdefault(diff.date, []).append(diff)
+    grouped = sorted(diffs_by_date.items())
+
+    return templates.TemplateResponse(
+        request,
+        "recalc_preview.html",
+        {
+            "active": "games",
+            "game": game,
+            "start_date": start_date,
+            "end_date": end_date,
+            "diffs": diffs,
+            "grouped": grouped,
+            "change_count": len(diffs),
+        },
+    )
+
+
 @router.post("/games/{game_id}/recalculate")
 async def game_recalculate(
     request: Request,
     game_id: str,
     start_date: str = Form(...),
     end_date: str = Form(...),
+    confirmed: str = Form(default=""),
     session: dict = Depends(require_admin),
 ):
-    try:
-        start = date_type.fromisoformat(start_date)
-        end = date_type.fromisoformat(end_date)
-    except ValueError:
+    parsed = _parse_recalc_range(start_date, end_date)
+    if parsed is None:
         request.session["flash"] = "Invalid date range."
         return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
-    if end < start:
-        request.session["flash"] = "End date must be on or after start date."
-        return RedirectResponse(url=f"/admin/games/{game_id}", status_code=303)
+    start, end = parsed
+    if confirmed != "true":
+        return RedirectResponse(url=_preview_url(game_id, start, end), status_code=303)
     db = _db_session()
     try:
         affected = recalculate_game_ranks(db, game_id, start_date=start, end_date=end)

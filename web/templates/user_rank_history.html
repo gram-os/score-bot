@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ username }} Rank History — Score Bot Admin{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="/admin/users/{{ user_id }}" class="back-link">&larr; {{ username }}</a>
+  <h2 style="margin-bottom:0;">Rank History</h2>
+  <code class="text-subtle" style="font-size:12px;">{{ user_id }}</code>
+</div>
+
+{% if not history %}
+<div class="empty">No data yet.</div>
+{% else %}
+<div class="card" style="padding:16px;margin-bottom:24px;overflow-x:auto;">
+  <svg viewBox="0 0 {{ chart_width }} {{ chart_height }}"
+       width="100%" height="{{ chart_height }}"
+       style="max-width:{{ chart_width }}px;display:block;">
+    <rect x="{{ chart_pad_left }}" y="{{ chart_pad_top }}"
+          width="{{ chart_width - chart_pad_left - chart_pad_right }}"
+          height="{{ chart_height - chart_pad_top - chart_pad_bottom }}"
+          fill="none" stroke="var(--border)" stroke-width="1"/>
+    {% for tick in y_ticks %}
+    <line x1="{{ chart_pad_left }}" y1="{{ tick.y }}"
+          x2="{{ chart_width - chart_pad_right }}" y2="{{ tick.y }}"
+          stroke="var(--border)" stroke-width="1" stroke-dasharray="2,3"/>
+    <text x="{{ chart_pad_left - 6 }}" y="{{ tick.y + 4 }}"
+          text-anchor="end" font-size="11" fill="var(--text-subtle)">#{{ tick.label }}</text>
+    {% endfor %}
+    <polyline points="{{ polyline }}"
+              fill="none" stroke="var(--c-primary)" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round"/>
+    {% for p in points %}
+    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="3.5" fill="var(--c-primary)">
+      <title>{{ p.label }}: rank {{ p.rank }} of {{ p.total_users }}</title>
+    </circle>
+    <text x="{{ p.x }}" y="{{ chart_height - chart_pad_bottom + 16 }}"
+          text-anchor="middle" font-size="10" fill="var(--text-subtle)"
+          transform="rotate(-30 {{ p.x }} {{ chart_height - chart_pad_bottom + 16 }})">{{ p.label }}</text>
+    {% endfor %}
+  </svg>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Lower rank is better. Y-axis grows downward.</div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Month</th>
+      <th>Rank</th>
+      <th>Total Users</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for h in history %}
+    <tr>
+      <td>{{ "%04d-%02d" | format(h.year, h.month) }}</td>
+      <td><strong>{{ h.rank }}</strong></td>
+      <td>{{ h.total_users }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

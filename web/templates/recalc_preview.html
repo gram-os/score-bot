@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Recalculate Preview — {{ game.name }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:16px;">
+  <a href="/admin/games/{{ game.id }}" class="back-link">{{ game.name }}</a>
+</div>
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+  <h2 style="margin-bottom:0;">Recalculate Preview</h2>
+  <span class="badge badge-{{ game.id }}">{{ game.id }}</span>
+</div>
+
+<p style="color:var(--text-muted);margin-bottom:16px;">
+  Range: <strong>{{ start_date }}</strong> → <strong>{{ end_date }}</strong>
+  &middot; Difficulty: <strong>{{ game.difficulty_multiplier }}×</strong>
+</p>
+
+<div class="stat-card" style="margin-bottom:20px;display:inline-block;">
+  <div class="stat-label">Submissions That Would Change</div>
+  <div class="stat-value">{{ change_count }}</div>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:24px;">
+  <form method="post" action="/admin/games/{{ game.id }}/recalculate" style="display:inline;">
+    <input type="hidden" name="start_date" value="{{ start_date }}">
+    <input type="hidden" name="end_date" value="{{ end_date }}">
+    <input type="hidden" name="confirmed" value="true">
+    <button type="submit" class="btn" {% if change_count == 0 %}disabled{% endif %}>Apply this recalc</button>
+  </form>
+  <a href="/admin/games/{{ game.id }}" class="btn btn-secondary">Cancel</a>
+</div>
+
+{% if change_count == 0 %}
+<div class="empty">No submissions would change in this range.</div>
+{% else %}
+{% for d, rows in grouped %}
+<div style="margin-bottom:24px;">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;">
+    {{ d }} ({{ rows | length }} change{{ '' if rows | length == 1 else 's' }})
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Current Rank</th>
+        <th>New Rank</th>
+        <th>Current Total</th>
+        <th>New Total</th>
+        <th>Δ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for diff in rows %}
+      <tr>
+        <td>{{ diff.username }}</td>
+        <td>{{ diff.current_rank }}</td>
+        <td>
+          {{ diff.new_rank }}
+          {% if diff.new_rank != diff.current_rank %}
+          <span style="color:var(--text-muted);">({{ '%+d' % (diff.new_rank - diff.current_rank) }})</span>
+          {% endif %}
+        </td>
+        <td>{{ diff.current_total }}</td>
+        <td><strong>{{ diff.new_total }}</strong></td>
+        <td style="color:{% if diff.new_total > diff.current_total %}var(--c-success){% elif diff.new_total < diff.current_total %}var(--c-danger){% else %}var(--text-muted){% endif %};">
+          {{ '%+.2f' % (diff.new_total - diff.current_total) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

@@ -196,6 +196,19 @@ class Feedback(Base):
     submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    actor_email: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    actor_role: Mapped[str] = mapped_column(String, nullable=False)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    target_type: Mapped[str] = mapped_column(String, nullable=False)
+    target_id: Mapped[str] = mapped_column(String, nullable=False)
+    details_json: Mapped[str] = mapped_column(String, nullable=False, default="{}")
+
+
 def get_engine(db_path: str | None = None):
     path = db_path or os.environ.get("DATABASE_PATH", "/data/scores.db")
     return create_engine(f"sqlite:///{path}")

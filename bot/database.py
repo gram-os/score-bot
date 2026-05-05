@@ -33,6 +33,7 @@ from bot.db.logs import get_logs
 from bot.db.models import (
     AdminConfig,
     AppLog,
+    AuditLog,
     Base,
     DailyPoll,
     Feedback,
@@ -66,6 +67,7 @@ from bot.db.monthly_stats import (
 )
 from bot.db.personal_bests import PersonalBests, get_best_base_score, get_personal_bests
 from bot.db.preferences import get_opted_in_preferences, get_preference, set_preference
+from bot.db.rank_history import RankHistoryPoint, get_rank_history
 from bot.db.seasons import get_current_season, get_season_ending_yesterday
 from bot.db.streaks import (
     GameDigestData,
@@ -82,6 +84,7 @@ from bot.db.streaks import (
     update_streak_on_submission,
 )
 from bot.db.submissions import (
+    RecalcDiff,
     ResetResult,
     UserSummary,
     add_submission_manual,
@@ -89,6 +92,7 @@ from bot.db.submissions import (
     delete_submission,
     get_users_summary,
     is_duplicate,
+    preview_recalculate_game_ranks,
     recalculate_game_ranks,
     record_submission,
     reset_all_submissions,
@@ -109,6 +113,7 @@ __all__ = [
     "GameAnalysisRow",
     "get_all_games_difficulty_analysis",
     "AppLog",
+    "AuditLog",
     "Base",
     "DailyPoll",
     "Feedback",
@@ -152,6 +157,8 @@ __all__ = [
     "get_users_for_h2h",
     "get_users_summary",
     "is_duplicate",
+    "preview_recalculate_game_ranks",
+    "RecalcDiff",
     "recalculate_game_ranks",
     "record_submission",
     "upsert_user",
@@ -179,6 +186,8 @@ __all__ = [
     "PersonalBests",
     "get_best_base_score",
     "get_personal_bests",
+    "RankHistoryPoint",
+    "get_rank_history",
     "HeadToHeadResult",
     "get_head_to_head",
     "add_suggestion",

@@ -6,8 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from bot.db.config import SCORING_TZ
-from bot.db.models import MonthlyRankSnapshot, Submission, User, UserAchievement, UserStreak
-from bot.scoring import assign_submission_rank
+from bot.db.models import Game, MonthlyRankSnapshot, Submission, User, UserAchievement, UserStreak
+from bot.scoring import _MULTIPLIER_EFFECTIVE_DATE, assign_submission_rank, calculate_speed_bonus
 
 
 def upsert_user(session: Session, user_id: str, username: str) -> None:
@@ -132,6 +132,81 @@ def recalculate_game_ranks(
     for d in dates:
         assign_submission_rank(session, game_id, d)
     return len(dates)
+
+
+@dataclass
+class RecalcDiff:
+    submission_id: int
+    username: str
+    date: date
+    current_total: float
+    current_rank: int
+    new_total: float
+    new_rank: int
+
+
+def _multiplier_for(game: "Game | None", submission_date: date) -> float:
+    if game is None or submission_date < _MULTIPLIER_EFFECTIVE_DATE:
+        return 1.0
+    return game.difficulty_multiplier
+
+
+def _simulate_rank_for_date(
+    session: Session, game_id: str, submission_date: date, multiplier: float
+) -> list[tuple[Submission, int, float]]:
+    submissions = session.scalars(
+        select(Submission)
+        .where(Submission.game_id == game_id, Submission.date == submission_date)
+        .order_by(Submission.submitted_at)
+    ).all()
+
+    results: list[tuple[Submission, int, float]] = []
+    next_rank = 1
+    for submission in submissions:
+        if submission.base_score > 0:
+            rank = next_rank
+            next_rank += 1
+            bonus = calculate_speed_bonus(rank)
+        else:
+            rank = 0
+            bonus = 0
+        new_total = round(submission.base_score * multiplier + bonus, 2)
+        results.append((submission, rank, new_total))
+    return results
+
+
+def preview_recalculate_game_ranks(
+    session: Session,
+    game_id: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[RecalcDiff]:
+    stmt = select(Submission.date).where(Submission.game_id == game_id)
+    if start_date is not None:
+        stmt = stmt.where(Submission.date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(Submission.date <= end_date)
+    dates = sorted(session.scalars(stmt.distinct()).all())
+
+    game = session.get(Game, game_id)
+    diffs: list[RecalcDiff] = []
+    for d in dates:
+        multiplier = _multiplier_for(game, d)
+        for submission, new_rank, new_total in _simulate_rank_for_date(session, game_id, d, multiplier):
+            if submission.submission_rank == new_rank and submission.total_score == new_total:
+                continue
+            diffs.append(
+                RecalcDiff(
+                    submission_id=submission.id,
+                    username=submission.username,
+                    date=d,
+                    current_total=submission.total_score,
+                    current_rank=submission.submission_rank,
+                    new_total=new_total,
+                    new_rank=new_rank,
+                )
+            )
+    return diffs
 
 
 @dataclass
