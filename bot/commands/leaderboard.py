@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import discord
 from discord import app_commands
@@ -17,23 +17,52 @@ from bot.helpers import game_autocomplete_choices, resolve_game_label
 
 log = logging.getLogger(__name__)
 
+_CUSTOM_RANGE_MAX_DAYS = 365
+
+
+def _parse_custom_range(start: str | None, end: str | None) -> tuple[date, date] | str:
+    if not start or not end:
+        return "Custom period requires both `start` and `end` (YYYY-MM-DD)."
+    try:
+        start_d = datetime.strptime(start, "%Y-%m-%d").date()
+        end_d = datetime.strptime(end, "%Y-%m-%d").date()
+    except ValueError:
+        return "Could not parse dates. Use `YYYY-MM-DD` for both `start` and `end`."
+    if end_d < start_d:
+        return "`end` must be on or after `start`."
+    if (end_d - start_d).days + 1 > _CUSTOM_RANGE_MAX_DAYS:
+        return f"Custom range capped at {_CUSTOM_RANGE_MAX_DAYS} days."
+    return start_d, end_d
+
 
 def register(tree: app_commands.CommandTree, registry, Session) -> None:
     @tree.command(name="leaderboard", description="Show the leaderboard")
     @app_commands.describe(
         game="Which game to show (default: all)",
         period="Time period (default: all time, or all periods when a game is selected)",
+        start="Start date for custom range (YYYY-MM-DD)",
+        end="End date for custom range (YYYY-MM-DD)",
     )
     @app_commands.choices(period=PERIOD_CHOICES)
     async def leaderboard(
         interaction: discord.Interaction,
-        game: str = None,
-        period: app_commands.Choice[str] = None,
+        game: str | None = None,
+        period: app_commands.Choice[str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
     ) -> None:
         game_id = game if game else "all"
         game_label = resolve_game_label(registry, game_id)
         show_all_periods = game_id != "all" and period is None
         period_value = period.value if period else "alltime"
+
+        custom_range: tuple[date, date] | None = None
+        if period_value == "custom":
+            parsed = _parse_custom_range(start, end)
+            if isinstance(parsed, str):
+                await interaction.response.send_message(parsed, ephemeral=True)
+                return
+            custom_range = parsed
 
         await interaction.response.defer()
 
@@ -41,7 +70,9 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
             if show_all_periods:
                 embed = await _build_per_game_embed(session, game_id, game_label)
             else:
-                embed = await _build_single_period_embed(session, registry, game_id, game_label, period_value)
+                embed = await _build_single_period_embed(
+                    session, registry, game_id, game_label, period_value, custom_range
+                )
             log_usage_event(
                 session,
                 "command.leaderboard",
@@ -113,9 +144,18 @@ async def _build_per_game_embed(session, game_id: str, game_label: str) -> disco
 
 
 async def _build_single_period_embed(
-    session, registry, game_id: str, game_label: str, period_value: str
+    session,
+    registry,
+    game_id: str,
+    game_label: str,
+    period_value: str,
+    custom_range: tuple[date, date] | None = None,
 ) -> discord.Embed:
-    rows = get_leaderboard(session, period=period_value, game_id=None if game_id == "all" else game_id)
+    lb_kwargs: dict = {"period": period_value, "game_id": None if game_id == "all" else game_id}
+    if custom_range is not None:
+        lb_kwargs["start_date"] = custom_range[0]
+        lb_kwargs["end_date"] = custom_range[1]
+    rows = get_leaderboard(session, **lb_kwargs)
 
     if game_id == "all":
         enabled_games = session.query(Game).filter(Game.enabled.is_(True)).all()
@@ -131,6 +171,8 @@ async def _build_single_period_embed(
     current_season = get_current_season(session)
     if period_value == "season":
         period_label = current_season.name if current_season else "Season"
+    elif period_value == "custom" and custom_range is not None:
+        period_label = f"Custom: {custom_range[0]} → {custom_range[1]}"
     else:
         period_label = PERIOD_LABELS[period_value]
 

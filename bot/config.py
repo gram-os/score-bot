@@ -36,6 +36,7 @@ PERIOD_CHOICES = [
     app_commands.Choice(name="Daily", value="daily"),
     app_commands.Choice(name="Weekly", value="weekly"),
     app_commands.Choice(name="Monthly", value="monthly"),
+    app_commands.Choice(name="Custom range", value="custom"),
 ]
 
 PERIOD_LABELS = {
@@ -44,4 +45,5 @@ PERIOD_LABELS = {
     "monthly": "Monthly",
     "alltime": "All Time",
     "season": "Season",
+    "custom": "Custom",
 }
