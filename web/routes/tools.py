@@ -13,6 +13,7 @@ from bot.database import (
     rebuild_all_streaks,
     reset_all_submissions,
 )
+from bot.db.config import SCORING_TZ
 from bot.db.submissions import redate_submissions
 from bot.parsers.registry import all_parsers
 from web.backfill import process_messages
@@ -62,16 +63,18 @@ async def tools_parse_test(
     finally:
         db.close()
 
+    now = dt.now(SCORING_TZ)
     results = []
     for parser in all_parsers():
         matched = parser.can_parse(message)
-        parse_result = parser.parse(message, "preview_user", dt.utcnow()) if matched else None
+        parse_result = parser.parse(message, "preview_user", now) if matched else None
         results.append(
             {
                 "game_id": parser.game_id,
                 "game_name": parser.game_name,
                 "matched": matched,
                 "parse_result": parse_result,
+                "broken": matched and parse_result is None,
             }
         )
 
