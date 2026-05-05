@@ -2,8 +2,10 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from bot.database import get_engine
@@ -39,6 +41,20 @@ async def not_authenticated_handler(request: Request, exc: NotAuthenticated):
         content="<h1>401 Unauthorized</h1><p>Access denied. Authenticate via Cloudflare Access and try again.</p>",
         status_code=401,
     )
+
+
+def _ping_database() -> None:
+    with Session(get_engine()) as session:
+        session.execute(select(1)).scalar()
+
+
+@app.get("/healthz")
+async def healthz() -> JSONResponse:
+    try:
+        _ping_database()
+    except Exception:
+        return JSONResponse({"status": "db-unreachable"}, status_code=503)
+    return JSONResponse({"status": "ok"}, status_code=200)
 
 
 @app.get("/")

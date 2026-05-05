@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Daily Challenge — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Daily Challenge</h2>
+
+{% if flash %}
+<div class="flash" style="margin:12px 0;padding:10px;background:var(--c-info-bg, #eef);border-radius:4px;">{{ flash }}</div>
+{% endif %}
+
+<p style="color:var(--text-muted);max-width:640px;">
+  When enabled, one game per day gets a multiplier on its speed bonus (1st/2nd/3rd places).
+  Off by default — submissions are unaffected unless this is turned on.
+</p>
+
+<div class="card" style="padding:16px;margin-bottom:16px;">
+  <h3 style="margin-top:0;">Status</h3>
+  <p>
+    <strong>Enabled:</strong>
+    {% if enabled %}<span style="color:var(--c-success, #2a7);">YES</span>{% else %}<span style="color:var(--text-subtle);">no</span>{% endif %}
+  </p>
+  <form method="post" action="/admin/daily-challenge/toggle" style="display:inline;">
+    <input type="hidden" name="enabled" value="{{ 'false' if enabled else 'true' }}">
+    <button type="submit">{{ 'Disable' if enabled else 'Enable' }}</button>
+  </form>
+</div>
+
+<div class="card" style="padding:16px;margin-bottom:16px;">
+  <h3 style="margin-top:0;">Mode</h3>
+  <p>Current mode: <strong>{{ mode }}</strong></p>
+  <form method="post" action="/admin/daily-challenge/mode">
+    <select name="mode">
+      <option value="random" {% if mode == 'random' %}selected{% endif %}>Random (system picks each day)</option>
+      <option value="manual" {% if mode == 'manual' %}selected{% endif %}>Manual (admin picks)</option>
+    </select>
+    <button type="submit">Save mode</button>
+  </form>
+</div>
+
+<div class="card" style="padding:16px;margin-bottom:16px;">
+  <h3 style="margin-top:0;">Multiplier</h3>
+  <p>Speed-bonus multiplier applied to the chosen game's daily winners.</p>
+  <form method="post" action="/admin/daily-challenge/multiplier">
+    <input type="number" name="multiplier" step="0.1" min="0.1" value="{{ multiplier }}" required>
+    <button type="submit">Save multiplier</button>
+  </form>
+</div>
+
+<div class="card" style="padding:16px;margin-bottom:16px;">
+  <h3 style="margin-top:0;">Today's challenge ({{ today }})</h3>
+  {% if today_game_id %}
+  <p>Today's game: <strong>{{ today_game_name or today_game_id }}</strong> (<code>{{ today_game_id }}</code>)</p>
+  {% else %}
+  <p style="color:var(--text-subtle);">No game selected for today.</p>
+  {% endif %}
+
+  {% if mode == 'manual' %}
+  <form method="post" action="/admin/daily-challenge/manual-pick">
+    <select name="game_id" required>
+      {% for g in enabled_games %}
+      <option value="{{ g.id }}" {% if today_game_id == g.id %}selected{% endif %}>{{ g.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Set today's game</button>
+  </form>
+  {% else %}
+  <form method="post" action="/admin/daily-challenge/reroll">
+    <button type="submit">Re-roll random pick</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

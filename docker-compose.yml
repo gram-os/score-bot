@@ -28,7 +28,7 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(2); sys.exit(0 if s.connect_ex(('localhost', 8000)) == 0 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz', timeout=3).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3

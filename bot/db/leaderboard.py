@@ -39,10 +39,16 @@ def _period_bounds(
 
 def get_leaderboard(
     session: Session,
-    period: Literal["daily", "weekly", "monthly", "alltime", "season"],
+    period: Literal["daily", "weekly", "monthly", "alltime", "season", "custom"],
     game_id: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> list[LeaderboardRow]:
-    if period == "season":
+    if period == "custom":
+        if start_date is None or end_date is None:
+            raise ValueError("custom period requires both start_date and end_date")
+        start, end = start_date, end_date
+    elif period == "season":
         season = get_current_season(session)
         start = season.start_date if season else None
         end = season.end_date if season else None

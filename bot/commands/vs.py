@@ -14,7 +14,7 @@ def register(tree: app_commands.CommandTree, registry, Session) -> None:
     async def vs(
         interaction: discord.Interaction,
         opponent: discord.Member,
-        game: str = None,
+        game: str | None = None,
     ) -> None:
         caller_id = str(interaction.user.id)
         opponent_id = str(opponent.id)

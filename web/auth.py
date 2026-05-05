@@ -6,6 +6,7 @@ from starlette.responses import RedirectResponse
 
 from web.deps import require_homunculus_access
 from web.routes import (
+    daily_challenge,
     dashboard,
     difficulty,
     feedback,
@@ -60,3 +61,4 @@ admin_router.include_router(monitoring.router)
 admin_router.include_router(system.router)
 admin_router.include_router(homunculus.router)
 admin_router.include_router(seasons.router)
+admin_router.include_router(daily_challenge.router)
