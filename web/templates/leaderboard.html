@@ -1,17 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Leaderboard — Score Bot Admin{% endblock %}
+{% block title %}{{ header }} — Score Bot Admin{% endblock %}
 {% block content %}
-<h2>Leaderboard</h2>
+<h2>{{ header }}</h2>
 
 <form class="filters" method="get" action="/admin/leaderboard">
-  <div class="filter-group">
-    <label>Period</label>
-    <select name="period">
-      {% for p in ['daily', 'weekly', 'monthly', 'alltime'] %}
-      <option value="{{ p }}" {% if period == p %}selected{% endif %}>{{ p | capitalize }}</option>
-      {% endfor %}
-    </select>
-  </div>
   <div class="filter-group">
     <label>Game</label>
     <select name="game">
@@ -21,10 +13,48 @@
       {% endfor %}
     </select>
   </div>
+  <div class="filter-group">
+    <label>Period</label>
+    <select name="period">
+      {% for p in periods %}
+      <option value="{{ p }}" {% if period == p %}selected{% endif %}>{{ p | capitalize }}</option>
+      {% endfor %}
+    </select>
+  </div>
   <div class="filter-group" style="justify-content: flex-end;">
     <button type="submit" class="btn btn-primary">View</button>
   </div>
 </form>
+
+{% if active_game %}
+<div class="card" style="padding:16px;margin-bottom:24px;">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">
+    {{ active_game.name }} — Today's standings (top 5)
+  </div>
+  {% if daily_top %}
+  <table>
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Username</th>
+        <th>Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in daily_top %}
+      <tr>
+        <td class="rank-{{ entry.rank }}">{{ entry.rank }}</td>
+        <td>{{ entry.username }}</td>
+        <td><strong>{{ entry.total_score | int }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No submissions for {{ active_game.name }} today.</div>
+  {% endif %}
+</div>
+{% endif %}
 
 {% if rows %}
 <table>
