@@ -1,4 +1,5 @@
 import calendar
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
@@ -69,7 +70,7 @@ async def users_list(
     return templates.TemplateResponse(
         request,
         "users.html",
-        {"active": "users", "users": users},
+        {"active": "users", "users": users, "today": date.today()},
     )
 
 

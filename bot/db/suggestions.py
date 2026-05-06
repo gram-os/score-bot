@@ -1,7 +1,8 @@
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from rapidfuzz import fuzz
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from bot.db.models import DailyPoll, GameSuggestion
@@ -76,3 +77,52 @@ def mark_poll_notified(session: Session, poll_id: int) -> None:
     poll = session.get(DailyPoll, poll_id)
     if poll:
         poll.notified = True
+
+
+# ---------------------------------------------------------------------------
+# Suggestion analytics
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SuggestionStats:
+    total: int
+    by_status: dict[str, int]
+    top_suggesters: list[dict]
+    timeline: list[dict]
+
+
+def get_suggestion_stats(session: Session) -> SuggestionStats:
+    total = session.scalar(select(func.count(GameSuggestion.id))) or 0
+
+    status_rows = session.execute(
+        select(GameSuggestion.status, func.count(GameSuggestion.id).label("cnt")).group_by(GameSuggestion.status)
+    ).all()
+    by_status = {row.status or "pending": row.cnt for row in status_rows}
+
+    suggester_rows = session.execute(
+        select(GameSuggestion.username, func.count(GameSuggestion.id).label("cnt"))
+        .where(GameSuggestion.username.isnot(None))
+        .group_by(GameSuggestion.username)
+        .order_by(func.count(GameSuggestion.id).desc())
+        .limit(10)
+    ).all()
+    top_suggesters = [{"username": r.username, "count": r.cnt} for r in suggester_rows]
+
+    # Monthly submission timeline
+    timeline_rows = (
+        session.execute(select(GameSuggestion.suggested_at).order_by(GameSuggestion.suggested_at.asc())).scalars().all()
+    )
+    monthly: dict[str, int] = {}
+    for ts in timeline_rows:
+        if ts:
+            key = ts.strftime("%Y-%m")
+            monthly[key] = monthly.get(key, 0) + 1
+    timeline = [{"month": k, "count": v} for k, v in sorted(monthly.items())]
+
+    return SuggestionStats(
+        total=total,
+        by_status=by_status,
+        top_suggesters=top_suggesters,
+        timeline=timeline,
+    )

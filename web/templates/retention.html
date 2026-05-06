@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Retention — Score Bot Admin{% endblock %}
+{% block content %}
+<h2>Retention &amp; Churn</h2>
+
+<!-- Health summary cards -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
+  <div class="stat-card" style="border-color:var(--c-success);">
+    <div class="stat-label">Active</div>
+    <div class="stat-value" style="color:var(--c-success);">{{ health.active_count }}</div>
+    <div style="font-size:10px;color:var(--text-subtle);margin-top:4px;">submitted in last 7 days</div>
+  </div>
+  <div class="stat-card" style="border-color:var(--c-warning-border);">
+    <div class="stat-label">At Risk</div>
+    <div class="stat-value" style="color:var(--c-warning-border);">{{ health.at_risk_count }}</div>
+    <div style="font-size:10px;color:var(--text-subtle);margin-top:4px;">8–30 days since last sub</div>
+  </div>
+  <div class="stat-card" style="border-color:var(--c-danger);">
+    <div class="stat-label">Churned</div>
+    <div class="stat-value" style="color:var(--c-danger);">{{ health.churned_count }}</div>
+    <div style="font-size:10px;color:var(--text-subtle);margin-top:4px;">30+ days since last sub</div>
+  </div>
+</div>
+
+<!-- Weekly active users chart -->
+{% if weekly %}
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Weekly Active Players (last 8 weeks)</div>
+<div class="card" style="padding:16px;margin-bottom:24px;">
+  <div style="position:relative;height:200px;"><canvas id="weeklyChart"></canvas></div>
+</div>
+{% endif %}
+
+<!-- Game drop-off table -->
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;">Game Drop-off (ever played vs. active last 30 days)</div>
+{% if dropoff %}
+<table style="margin-bottom:24px;">
+  <thead>
+    <tr>
+      <th>Game</th>
+      <th>Ever Played</th>
+      <th>Active (30d)</th>
+      <th>Dropped Off</th>
+      <th>Drop-off Rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in dropoff %}
+    <tr>
+      <td><span class="badge badge-{{ row.game_id }}">{{ row.game_name }}</span></td>
+      <td>{{ row.ever_played }}</td>
+      <td>{{ row.active_30d }}</td>
+      <td>{{ row.ever_played - row.active_30d }}</td>
+      <td>
+        <span style="color:{% if row.dropoff_rate > 0.5 %}var(--c-danger){% elif row.dropoff_rate > 0.25 %}var(--c-warning-border){% else %}var(--c-success){% endif %};">
+          {{ (row.dropoff_rate * 100) | round(1) }}%
+        </span>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty" style="margin-bottom:24px;">No submission data yet.</div>
+{% endif %}
+
+<!-- Health breakdown tables -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--c-success);margin-bottom:8px;">Active players</div>
+    {% if health.active_users %}
+    <table>
+      <thead><tr><th>Player</th><th>Last Active</th></tr></thead>
+      <tbody>
+        {% for u in health.active_users %}
+        <tr>
+          <td><a href="/admin/users/{{ u.user_id }}" class="text-link" style="text-decoration:none;">{{ u.username }}</a></td>
+          <td style="font-size:11px;color:var(--text-subtle);">{{ u.days_ago }}d ago</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">None</div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--c-warning-border);margin-bottom:8px;">At-risk players</div>
+    {% if health.at_risk_users %}
+    <table>
+      <thead><tr><th>Player</th><th>Last Active</th></tr></thead>
+      <tbody>
+        {% for u in health.at_risk_users %}
+        <tr>
+          <td><a href="/admin/users/{{ u.user_id }}" class="text-link" style="text-decoration:none;">{{ u.username }}</a></td>
+          <td style="font-size:11px;color:var(--text-subtle);">{{ u.days_ago }}d ago</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">None</div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--c-danger);margin-bottom:8px;">Churned players</div>
+    {% if health.churned_users %}
+    <table>
+      <thead><tr><th>Player</th><th>Last Active</th></tr></thead>
+      <tbody>
+        {% for u in health.churned_users %}
+        <tr>
+          <td><a href="/admin/users/{{ u.user_id }}" class="text-link" style="text-decoration:none;">{{ u.username }}</a></td>
+          <td style="font-size:11px;color:var(--text-subtle);">{{ u.days_ago }}d ago</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">None</div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% if weekly %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const DATA = {{ weekly | tojson }};
+
+  function getStyle() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      subtle:  s.getPropertyValue('--text-subtle').trim() || '#999',
+      border:  s.getPropertyValue('--border').trim()      || '#ddd',
+      success: s.getPropertyValue('--c-success').trim()   || '#059669',
+    };
+  }
+
+  let chart = null;
+
+  function buildChart() {
+    const canvas = document.getElementById('weeklyChart');
+    if (!canvas) return;
+    const s = getStyle();
+    const labels = DATA.map(d => d.week_start);
+    const counts = DATA.map(d => d.active_users);
+
+    const config = {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Active Players',
+          data: counts,
+          backgroundColor: s.success + 'aa',
+          borderColor: s.success,
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: s.subtle }, grid: { color: s.border } },
+          y: { beginAtZero: true, ticks: { precision: 0, color: s.subtle }, grid: { color: s.border } },
+        },
+      },
+    };
+
+    if (chart) {
+      chart.data = config.data;
+      chart.options = config.options;
+      chart.update();
+    } else {
+      chart = new Chart(canvas.getContext('2d'), config);
+    }
+  }
+
+  document.addEventListener('themechange', buildChart);
+  buildChart();
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Score Anomalies — Score Bot Admin{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:baseline;gap:16px;margin-bottom:8px;flex-wrap:wrap;">
+  <h2 style="margin-bottom:0;">Score Anomalies</h2>
+  <span style="font-size:11px;color:var(--text-subtle);">last 30 days · ≥2.5σ from a player's historical mean for that game · requires ≥10 past scores</span>
+</div>
+
+{% if anomalies %}
+<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;">
+  <div class="stat-card">
+    <div class="stat-label">Flagged</div>
+    <div class="stat-value">{{ anomalies | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Unusually High</div>
+    <div class="stat-value" style="color:var(--c-success);">{{ anomalies | selectattr('direction','eq','high') | list | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Unusually Low</div>
+    <div class="stat-value" style="color:var(--c-danger);">{{ anomalies | selectattr('direction','eq','low') | list | length }}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Player</th>
+      <th>Game</th>
+      <th>Score</th>
+      <th>Usual Range</th>
+      <th>Z-Score</th>
+      <th>Direction</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in anomalies %}
+    <tr>
+      <td style="white-space:nowrap;font-family:monospace;font-size:12px;color:var(--text-muted);">{{ a.date }}</td>
+      <td><a href="/admin/users/{{ a.user_id }}" class="text-link" style="text-decoration:none;">{{ a.username }}</a></td>
+      <td><span class="badge badge-{{ a.game_id }}">{{ a.game_name }}</span></td>
+      <td>
+        <strong style="color:{% if a.direction == 'high' %}var(--c-success){% else %}var(--c-danger){% endif %};">
+          {{ a.base_score | int }}
+        </strong>
+      </td>
+      <td style="font-size:12px;color:var(--text-muted);">
+        {{ (a.user_mean - a.user_stddev) | round(0) | int }}–{{ (a.user_mean + a.user_stddev) | round(0) | int }}
+        <span style="font-size:10px;">(μ={{ a.user_mean }}, σ={{ a.user_stddev }})</span>
+      </td>
+      <td>
+        <span style="font-weight:700;color:{% if a.direction == 'high' %}var(--c-success){% else %}var(--c-danger){% endif %};">
+          {% if a.direction == 'high' %}+{% endif %}{{ a.z_score }}σ
+        </span>
+      </td>
+      <td>
+        {% if a.direction == 'high' %}
+          <span class="badge" style="background:color-mix(in srgb,var(--c-success) 15%,transparent);color:var(--c-success);">High</span>
+        {% else %}
+          <span class="badge" style="background:color-mix(in srgb,var(--c-danger) 15%,transparent);color:var(--c-danger);">Low</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="/admin/submissions?user_id={{ a.user_id }}&game={{ a.game_id }}" class="btn btn-secondary" style="text-decoration:none;font-size:10px;padding:4px 8px;">History</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+<div class="empty">No anomalies detected in the last 30 days — all scores look within normal range.</div>
+{% endif %}
+
+<div style="margin-top:20px;font-size:11px;color:var(--text-subtle);">
+  An anomaly is a score more than 2.5 standard deviations from a player's personal average for that game.
+  This can indicate a genuinely exceptional performance, a copy-paste error, or a parser edge case.
+  High scores are expected on easy days; low scores can indicate missed submissions or parse failures.
+</div>
+{% endblock %}

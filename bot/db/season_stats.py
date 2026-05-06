@@ -194,3 +194,48 @@ def get_season_daily_activity(session: Session, season: Season) -> list[SeasonDa
         .order_by(Submission.date.asc())
     ).all()
     return [SeasonDailyPoint(date=str(r.date), count=r.cnt) for r in rows]
+
+
+@dataclass
+class SeasonForecastRow:
+    rank: int
+    user_id: str
+    username: str
+    current_score: float
+    projected_score: float
+    submission_count: int
+
+
+def get_season_forecast(session: Session, season: Season) -> list[SeasonForecastRow]:
+    """Project final standings for an active season via linear extrapolation."""
+    today = date.today()
+    elapsed_days = max((today - season.start_date).days, 1)
+    total_days = max((season.end_date - season.start_date).days + 1, 1)
+
+    rows = session.execute(
+        select(
+            Submission.user_id,
+            User.username,
+            func.sum(Submission.total_score).label("pts"),
+            func.count(Submission.id).label("cnt"),
+        )
+        .join(User, Submission.user_id == User.user_id)
+        .where(Submission.date >= season.start_date, Submission.date <= season.end_date)
+        .group_by(Submission.user_id)
+        .order_by(func.sum(Submission.total_score).desc())
+    ).all()
+
+    result = []
+    for i, r in enumerate(rows):
+        projected = r.pts * total_days / elapsed_days
+        result.append(
+            SeasonForecastRow(
+                rank=i + 1,
+                user_id=r.user_id,
+                username=r.username,
+                current_score=r.pts,
+                projected_score=round(projected, 0),
+                submission_count=r.cnt,
+            )
+        )
+    return result

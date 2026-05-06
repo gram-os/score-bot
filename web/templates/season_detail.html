@@ -128,6 +128,40 @@
 
 </div>
 
+{% if is_current and forecast %}
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;margin-top:8px;">
+  Projected Final Standings
+  <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-subtle);font-size:10px;margin-left:8px;">linear extrapolation from current pace</span>
+</div>
+<table style="margin-bottom:24px;">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Player</th>
+      <th>Current</th>
+      <th>Projected</th>
+      <th>Submissions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in forecast %}
+    <tr>
+      <td>
+        {% if row.rank == 1 %}<span class="rank-1">🥇</span>
+        {% elif row.rank == 2 %}<span class="rank-2">🥈</span>
+        {% elif row.rank == 3 %}<span class="rank-3">🥉</span>
+        {% else %}<span class="text-subtle">#{{ row.rank }}</span>{% endif %}
+      </td>
+      <td><a href="/admin/users/{{ row.user_id }}" class="text-link" style="text-decoration:none;">{{ row.username }}</a></td>
+      <td>{{ row.current_score | int }}</td>
+      <td><strong>{{ row.projected_score | int }}</strong></td>
+      <td>{{ row.submission_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
 {% else %}
 <div class="empty" style="margin-bottom:24px;">Season hasn't started yet — no data to show.</div>
 {% endif %}

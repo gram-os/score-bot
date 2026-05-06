@@ -34,6 +34,51 @@
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 {% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
 
+<!-- Analytics summary -->
+{% if stats and stats.total > 0 %}
+<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+
+  <div style="flex:1;min-width:200px;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;">By Status</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      {% for status, count in stats.by_status.items() %}
+      <div class="stat-card" style="min-width:80px;padding:10px 14px;">
+        <div class="stat-label">{{ status | capitalize }}</div>
+        <div class="stat-value" style="font-size:18px;">{{ count }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if stats.top_suggesters %}
+  <div style="flex:1;min-width:200px;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;">Top Requesters</div>
+    <table>
+      <thead><tr><th>User</th><th>Suggestions</th></tr></thead>
+      <tbody>
+        {% for s in stats.top_suggesters[:5] %}
+        <tr>
+          <td>{{ s.username }}</td>
+          <td>{{ s.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if stats.timeline %}
+  <div style="flex:2;min-width:280px;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;">Submission Timeline</div>
+    <div class="card" style="padding:12px;">
+      <div style="position:relative;height:120px;"><canvas id="timelineChart"></canvas></div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
 {% if suggestions %}
 <table>
   <thead>
@@ -75,5 +120,47 @@
 </table>
 {% else %}
 <div class="empty">No suggestions yet.</div>
+{% endif %}
+
+{% if stats and stats.timeline %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const DATA = {{ stats.timeline | tojson }};
+  function getStyle() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      subtle:  s.getPropertyValue('--text-subtle').trim() || '#999',
+      border:  s.getPropertyValue('--border').trim()      || '#ddd',
+      primary: s.getPropertyValue('--c-primary').trim()   || '#e0457a',
+    };
+  }
+  let chart = null;
+  function buildChart() {
+    const canvas = document.getElementById('timelineChart');
+    if (!canvas) return;
+    const s = getStyle();
+    const config = {
+      type: 'bar',
+      data: {
+        labels: DATA.map(d => d.month),
+        datasets: [{ data: DATA.map(d => d.count), backgroundColor: s.primary + 'aa', borderColor: s.primary, borderWidth: 2 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: s.subtle, maxTicksLimit: 8 }, grid: { color: s.border } },
+          y: { beginAtZero: true, ticks: { precision: 0, color: s.subtle }, grid: { color: s.border } },
+        },
+      },
+    };
+    if (chart) { chart.data = config.data; chart.options = config.options; chart.update(); }
+    else { chart = new Chart(canvas.getContext('2d'), config); }
+  }
+  document.addEventListener('themechange', buildChart);
+  buildChart();
+})();
+</script>
 {% endif %}
 {% endblock %}

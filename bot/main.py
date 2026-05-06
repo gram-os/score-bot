@@ -16,6 +16,7 @@ from bot.commands import (
     help,
     homunculus,
     leaderboard,
+    missing,
     mystats,
     profile,
     remind,
@@ -67,6 +68,7 @@ _COMMAND_MODULES = [
     help,
     homunculus,
     submitted,
+    missing,
     seasons,
     halloffame,
 ]

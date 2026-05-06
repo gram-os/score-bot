@@ -17,6 +17,7 @@
 <div class="tab-bar">
   <a href="/admin/monitoring?tab=logs" class="tab-btn {% if tab == 'logs' %}active{% endif %}">Logs</a>
   <a href="/admin/monitoring?tab=usage" class="tab-btn {% if tab == 'usage' %}active{% endif %}">Usage</a>
+  <a href="/admin/monitoring?tab=audit" class="tab-btn {% if tab == 'audit' %}active{% endif %}">Audit Log</a>
 </div>
 
 {% if tab == 'logs' %}
@@ -87,6 +88,73 @@
 </div>
 {% else %}
 <div class="empty">No log entries found.</div>
+{% endif %}
+
+{% elif tab == 'audit' %}
+
+<div class="filters">
+  <form method="get" action="/admin/monitoring" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;width:100%">
+    <input type="hidden" name="tab" value="audit">
+    <div class="filter-group">
+      <label>Action</label>
+      <select name="audit_action" class="input" style="width:190px;">
+        <option value="">All actions</option>
+        {% for a in audit_actions %}
+        <option value="{{ a }}" {% if audit_filters.action == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Actor Email</label>
+      <input type="text" name="audit_actor" value="{{ audit_filters.actor }}" class="input" placeholder="email contains…" style="width:200px">
+    </div>
+    <div class="filter-group">
+      <label>From</label>
+      <input type="date" name="audit_from" value="{{ audit_filters.date_from }}" class="input">
+    </div>
+    <div class="filter-group">
+      <label>To</label>
+      <input type="date" name="audit_to" value="{{ audit_filters.date_to }}" class="input">
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="/admin/monitoring?tab=audit" class="btn btn-secondary">Clear</a>
+  </form>
+</div>
+
+<div style="margin-bottom:12px;color:var(--text-muted);font-size:13px;">
+  {{ total }} entr{{ 'y' if total == 1 else 'ies' }}
+</div>
+
+{% if audit_entries %}
+<table>
+  <thead>
+    <tr>
+      <th>Timestamp ({{ tz_label }})</th>
+      <th>Actor</th>
+      <th>Action</th>
+      <th>Target</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in audit_entries %}
+    <tr>
+      <td style="white-space:nowrap;color:var(--text-muted);font-size:12px;font-family:monospace">{{ e.created_at }}</td>
+      <td style="font-size:12px;color:var(--text-muted);">{{ e.actor_email }}</td>
+      <td><span class="badge badge-info" style="white-space:nowrap;">{{ e.action }}</span></td>
+      <td style="font-size:12px;color:var(--text-muted);">{{ e.target_type }}:{{ e.target_id }}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--text-subtle);max-width:300px;word-break:break-all;">{{ e.details }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if page > 1 %}<a href="{{ page_url(page - 1) }}">← Prev</a>{% endif %}
+  <span class="current">{{ page }}</span>
+  {% if has_next %}<a href="{{ page_url(page + 1) }}">Next →</a>{% endif %}
+</div>
+{% else %}
+<div class="empty">No audit entries found.</div>
 {% endif %}
 
 {% else %}

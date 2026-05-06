@@ -565,3 +565,266 @@ def get_submission_hour_distribution(session: Session) -> list[HourBucket]:
     for submitted_at in rows:
         counts[submitted_at.hour] += 1
     return [HourBucket(hour=h, count=counts[h]) for h in range(24)]
+
+
+# ---------------------------------------------------------------------------
+# Retention & churn
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class WeeklyActiveUsers:
+    week_start: str
+    active_users: int
+
+
+def get_weekly_active_users(session: Session, weeks: int = 8) -> list[WeeklyActiveUsers]:
+    """Return week-over-week distinct active user counts for the last N weeks."""
+    today = _today()
+    result = []
+    for i in range(weeks - 1, -1, -1):
+        week_end = today - timedelta(days=today.weekday() + 7 * i)
+        week_start = week_end - timedelta(days=6)
+        count = (
+            session.scalar(
+                select(func.count(distinct(Submission.user_id))).where(
+                    Submission.date >= week_start, Submission.date <= week_end
+                )
+            )
+            or 0
+        )
+        result.append(WeeklyActiveUsers(week_start=str(week_start), active_users=count))
+    return result
+
+
+@dataclass
+class UserHealthCounts:
+    active_count: int
+    at_risk_count: int
+    churned_count: int
+    active_users: list[dict]
+    at_risk_users: list[dict]
+    churned_users: list[dict]
+
+
+def get_user_health_breakdown(session: Session) -> UserHealthCounts:
+    """Bucket players as active (<7 days), at-risk (7–30 days), or churned (>30 days)."""
+    today = _today()
+    rows = session.execute(
+        select(Submission.user_id, Submission.username, func.max(Submission.date).label("last_date"))
+        .group_by(Submission.user_id, Submission.username)
+        .order_by(func.max(Submission.date).desc())
+    ).all()
+
+    active, at_risk, churned = [], [], []
+    for row in rows:
+        days_ago = (today - row.last_date).days
+        entry = {
+            "user_id": row.user_id,
+            "username": row.username,
+            "last_date": str(row.last_date),
+            "days_ago": days_ago,
+        }
+        if days_ago <= 7:
+            active.append(entry)
+        elif days_ago <= 30:
+            at_risk.append(entry)
+        else:
+            churned.append(entry)
+
+    return UserHealthCounts(
+        active_count=len(active),
+        at_risk_count=len(at_risk),
+        churned_count=len(churned),
+        active_users=active,
+        at_risk_users=at_risk,
+        churned_users=churned,
+    )
+
+
+@dataclass
+class GameDropoffRow:
+    game_id: str
+    game_name: str
+    ever_played: int
+    active_30d: int
+    dropoff_rate: float
+
+
+def get_game_dropoff_rates(session: Session) -> list[GameDropoffRow]:
+    """Per-game: how many players ever played vs. played in the last 30 days."""
+    today = _today()
+    cutoff = today - timedelta(days=30)
+
+    ever_rows = session.execute(
+        select(
+            Submission.game_id,
+            Game.name.label("game_name"),
+            func.count(distinct(Submission.user_id)).label("ever"),
+        )
+        .join(Game, Submission.game_id == Game.id)
+        .group_by(Submission.game_id, Game.name)
+    ).all()
+
+    active_rows = session.execute(
+        select(Submission.game_id, func.count(distinct(Submission.user_id)).label("active"))
+        .where(Submission.date >= cutoff)
+        .group_by(Submission.game_id)
+    ).all()
+    active_map = {r.game_id: r.active for r in active_rows}
+
+    result = []
+    for row in ever_rows:
+        ever = row.ever
+        active = active_map.get(row.game_id, 0)
+        dropoff = round((ever - active) / ever, 4) if ever > 0 else 0.0
+        result.append(
+            GameDropoffRow(
+                game_id=row.game_id,
+                game_name=row.game_name,
+                ever_played=ever,
+                active_30d=active,
+                dropoff_rate=dropoff,
+            )
+        )
+    result.sort(key=lambda r: r.dropoff_rate, reverse=True)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Game heatmap
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class HeatmapCell:
+    date: str
+    count: int
+    weekday: int
+    week: int
+
+
+def get_game_submission_heatmap(session: Session, game_id: str, days: int = 91) -> list[HeatmapCell]:
+    """Return per-day submission counts for a calendar heatmap (last N days)."""
+    today = _today()
+    cutoff = today - timedelta(days=days - 1)
+
+    rows = session.execute(
+        select(Submission.date, func.count(Submission.id).label("cnt"))
+        .where(Submission.game_id == game_id, Submission.date >= cutoff)
+        .group_by(Submission.date)
+    ).all()
+    count_map = {row.date: row.cnt for row in rows}
+
+    cells = []
+    # Align start to Monday of cutoff week
+    start = cutoff - timedelta(days=cutoff.weekday())
+    current = start
+    week = 0
+    while current <= today:
+        cells.append(
+            HeatmapCell(
+                date=str(current),
+                count=count_map.get(current, 0),
+                weekday=current.weekday(),
+                week=week,
+            )
+        )
+        current += timedelta(days=1)
+        if current.weekday() == 0:
+            week += 1
+    return cells
+
+
+# ---------------------------------------------------------------------------
+# Score anomaly detection
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AnomalyRow:
+    submission_id: int
+    user_id: str
+    username: str
+    game_id: str
+    game_name: str
+    date: str
+    base_score: float
+    user_mean: float
+    user_stddev: float
+    z_score: float
+    direction: str
+
+
+def get_score_anomalies(
+    session: Session,
+    lookback_days: int = 30,
+    threshold: float = 2.5,
+    min_history: int = 10,
+) -> list[AnomalyRow]:
+    """Return recent submissions that are statistical outliers for that user+game pair."""
+    today = _today()
+    cutoff = today - timedelta(days=lookback_days)
+
+    # Compute per-user per-game mean and stdev from all-time history
+    stats_rows = session.execute(
+        select(
+            Submission.user_id,
+            Submission.game_id,
+            func.avg(Submission.base_score).label("mean"),
+            func.count(Submission.id).label("cnt"),
+        )
+        .group_by(Submission.user_id, Submission.game_id)
+        .having(func.count(Submission.id) >= min_history)
+    ).all()
+
+    # Stdev requires pulling scores per pair (SQLite lacks stddev)
+    stats_map: dict[tuple[str, str], tuple[float, float]] = {}
+    for row in stats_rows:
+        scores = [
+            r.base_score
+            for r in session.execute(
+                select(Submission.base_score).where(
+                    Submission.user_id == row.user_id, Submission.game_id == row.game_id
+                )
+            ).all()
+        ]
+        if len(scores) >= min_history:
+            stddev = statistics.stdev(scores) if len(scores) > 1 else 0.0
+            if stddev > 0:
+                stats_map[(row.user_id, row.game_id)] = (row.mean, stddev)
+
+    # Fetch recent submissions and check against stats
+    recent = session.execute(
+        select(Submission, Game.name.label("game_name"))
+        .join(Game, Submission.game_id == Game.id)
+        .where(Submission.date >= cutoff)
+        .order_by(Submission.date.desc())
+    ).all()
+
+    anomalies = []
+    for sub, game_name in recent:
+        key = (sub.user_id, sub.game_id)
+        if key not in stats_map:
+            continue
+        mean, stddev = stats_map[key]
+        z = (sub.base_score - mean) / stddev
+        if abs(z) >= threshold:
+            anomalies.append(
+                AnomalyRow(
+                    submission_id=sub.id,
+                    user_id=sub.user_id,
+                    username=sub.username,
+                    game_id=sub.game_id,
+                    game_name=game_name,
+                    date=str(sub.date),
+                    base_score=sub.base_score,
+                    user_mean=round(mean, 1),
+                    user_stddev=round(stddev, 1),
+                    z_score=round(z, 2),
+                    direction="high" if z > 0 else "low",
+                )
+            )
+
+    anomalies.sort(key=lambda r: abs(r.z_score), reverse=True)
+    return anomalies

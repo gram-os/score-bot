@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from bot.db.models import AuditLog
@@ -50,3 +50,32 @@ def search(
         stmt = stmt.where(AuditLog.actor_email.ilike(f"%{actor_email_contains}%"))
     stmt = stmt.order_by(AuditLog.created_at.desc()).limit(limit)
     return list(session.scalars(stmt).all())
+
+
+def search_paginated(
+    session: Session,
+    *,
+    action_contains: str | None = None,
+    actor_email_contains: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[AuditLog], int]:
+    stmt = select(AuditLog)
+    if action_contains:
+        stmt = stmt.where(AuditLog.action.ilike(f"%{action_contains}%"))
+    if actor_email_contains:
+        stmt = stmt.where(AuditLog.actor_email.ilike(f"%{actor_email_contains}%"))
+    if date_from:
+        stmt = stmt.where(AuditLog.created_at >= date_from)
+    if date_to:
+        stmt = stmt.where(AuditLog.created_at <= date_to + " 23:59:59")
+    total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(AuditLog.created_at.desc()).limit(limit).offset(offset)
+    return list(session.scalars(stmt).all()), total
+
+
+def distinct_actions(session: Session) -> list[str]:
+    rows = session.execute(select(AuditLog.action).distinct().order_by(AuditLog.action)).scalars().all()
+    return list(rows)

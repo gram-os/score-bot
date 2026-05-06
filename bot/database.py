@@ -19,10 +19,12 @@ from bot.db.analytics import (
     get_kpi_today,
     get_score_distribution,
     get_speed_bonus_leaders,
+    get_game_submission_heatmap,
     get_user_per_game_stats,
     get_user_score_history,
     get_user_submission_dates,
     get_users_for_h2h,
+    HeatmapCell,
 )
 from bot.db.config import get_config, set_config
 from bot.db.feedback import add_feedback, get_all_feedback
@@ -122,6 +124,7 @@ __all__ = [
     "GameDifficultyRow",
     "GameSpeedBonusStats",
     "GameSuggestion",
+    "HeatmapCell",
     "HomunculusUpgrade",
     "KpiToday",
     "Season",
@@ -148,6 +151,7 @@ __all__ = [
     "get_game_difficulty_metrics",
     "get_game_raw_data_breakdown",
     "get_game_speed_bonus_stats",
+    "get_game_submission_heatmap",
     "get_kpi_today",
     "get_score_distribution",
     "get_speed_bonus_leaders",
