@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
 
 from bot.db.analytics import get_score_anomalies
 from web.deps import _db_session, require_admin, templates

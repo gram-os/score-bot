@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from rapidfuzz import fuzz
-from sqlalchemy import distinct, func, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from bot.db.models import DailyPoll, GameSuggestion
@@ -96,8 +96,7 @@ def get_suggestion_stats(session: Session) -> SuggestionStats:
     total = session.scalar(select(func.count(GameSuggestion.id))) or 0
 
     status_rows = session.execute(
-        select(GameSuggestion.status, func.count(GameSuggestion.id).label("cnt"))
-        .group_by(GameSuggestion.status)
+        select(GameSuggestion.status, func.count(GameSuggestion.id).label("cnt")).group_by(GameSuggestion.status)
     ).all()
     by_status = {row.status or "pending": row.cnt for row in status_rows}
 
@@ -111,9 +110,9 @@ def get_suggestion_stats(session: Session) -> SuggestionStats:
     top_suggesters = [{"username": r.username, "count": r.cnt} for r in suggester_rows]
 
     # Monthly submission timeline
-    timeline_rows = session.execute(
-        select(GameSuggestion.suggested_at).order_by(GameSuggestion.suggested_at.asc())
-    ).scalars().all()
+    timeline_rows = (
+        session.execute(select(GameSuggestion.suggested_at).order_by(GameSuggestion.suggested_at.asc())).scalars().all()
+    )
     monthly: dict[str, int] = {}
     for ts in timeline_rows:
         if ts:

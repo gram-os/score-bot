@@ -77,7 +77,5 @@ def search_paginated(
 
 
 def distinct_actions(session: Session) -> list[str]:
-    rows = session.execute(
-        select(AuditLog.action).distinct().order_by(AuditLog.action)
-    ).scalars().all()
+    rows = session.execute(select(AuditLog.action).distinct().order_by(AuditLog.action)).scalars().all()
     return list(rows)

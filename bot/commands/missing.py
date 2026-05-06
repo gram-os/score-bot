@@ -14,9 +14,7 @@ log = logging.getLogger(__name__)
 def get_missing_games(session, user_id: str) -> list[str]:
     today = datetime.now(SCORING_TZ).date()
 
-    enabled_games = session.execute(
-        select(Game.id, Game.name).where(Game.enabled.is_(True)).order_by(Game.name)
-    ).all()
+    enabled_games = session.execute(select(Game.id, Game.name).where(Game.enabled.is_(True)).order_by(Game.name)).all()
 
     submitted_ids = {
         row.game_id

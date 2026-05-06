@@ -118,10 +118,7 @@ async def game_detail_stats(
                 "rank2": speed_stats.rank2_count,
                 "rank3": speed_stats.rank3_count,
             },
-            "heatmap": [
-                {"date": c.date, "count": c.count, "weekday": c.weekday, "week": c.week}
-                for c in heatmap
-            ],
+            "heatmap": [{"date": c.date, "count": c.count, "weekday": c.weekday, "week": c.week} for c in heatmap],
         }
     )
 

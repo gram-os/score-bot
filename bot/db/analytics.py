@@ -619,7 +619,12 @@ def get_user_health_breakdown(session: Session) -> UserHealthCounts:
     active, at_risk, churned = [], [], []
     for row in rows:
         days_ago = (today - row.last_date).days
-        entry = {"user_id": row.user_id, "username": row.username, "last_date": str(row.last_date), "days_ago": days_ago}
+        entry = {
+            "user_id": row.user_id,
+            "username": row.username,
+            "last_date": str(row.last_date),
+            "days_ago": days_ago,
+        }
         if days_ago <= 7:
             active.append(entry)
         elif days_ago <= 30:

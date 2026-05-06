@@ -103,7 +103,9 @@ async def monitoring_view(
             audit_entries = [
                 {
                     "id": e.id,
-                    "created_at": e.created_at.replace(tzinfo=timezone.utc).astimezone(tz).strftime("%Y-%m-%d %H:%M:%S"),
+                    "created_at": e.created_at.replace(tzinfo=timezone.utc)
+                    .astimezone(tz)
+                    .strftime("%Y-%m-%d %H:%M:%S"),
                     "actor_email": e.actor_email,
                     "actor_role": e.actor_role,
                     "action": e.action,
@@ -125,9 +127,13 @@ async def monitoring_view(
             return build_page_url("/admin/monitoring", p, tab=tab, level=level, search=search, logger=logger)
         if tab == "audit":
             return build_page_url(
-                "/admin/monitoring", p, tab=tab,
-                audit_action=audit_action, audit_actor=audit_actor,
-                audit_from=audit_from, audit_to=audit_to,
+                "/admin/monitoring",
+                p,
+                tab=tab,
+                audit_action=audit_action,
+                audit_actor=audit_actor,
+                audit_from=audit_from,
+                audit_to=audit_to,
             )
         return build_page_url("/admin/monitoring", p, tab=tab, event_type=event_type)
 

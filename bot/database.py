@@ -1,38 +1,28 @@
 from bot.db.achievements import award_season_champion, get_season_champion_user_ids, get_user_achievements
 from bot.db.analytics import (
-    AnomalyRow,
     GameAnalysisRow,
     GameDifficultyMetrics,
     GameDifficultyRow,
-    GameDropoffRow,
     GameSpeedBonusStats,
-    HeatmapCell,
     KpiToday,
     ScoreBucket,
     ScoreTimePoint,
     SpeedBonusLeader,
     UserGameRow,
-    UserHealthCounts,
     UserScorePoint,
-    WeeklyActiveUsers,
     get_all_games_difficulty_analysis,
     get_avg_score_over_time,
     get_game_difficulty_comparison,
     get_game_difficulty_metrics,
-    get_game_dropoff_rates,
     get_game_raw_data_breakdown,
     get_game_speed_bonus_stats,
-    get_game_submission_heatmap,
     get_kpi_today,
-    get_score_anomalies,
     get_score_distribution,
     get_speed_bonus_leaders,
-    get_user_health_breakdown,
     get_user_per_game_stats,
     get_user_score_history,
     get_user_submission_dates,
     get_users_for_h2h,
-    get_weekly_active_users,
 )
 from bot.db.config import get_config, set_config
 from bot.db.feedback import add_feedback, get_all_feedback
@@ -109,12 +99,10 @@ from bot.db.submissions import (
     upsert_user,
 )
 from bot.db.suggestions import (
-    SuggestionStats,
     add_suggestion,
     create_daily_poll,
     find_similar_name,
     get_latest_unnotified_poll,
-    get_suggestion_stats,
     get_unpolled_suggestions,
     mark_poll_notified,
 )
