@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
+from bot.db import audit
 from bot.db.models import Season, get_engine
 from bot.db.season_stats import (
     get_season_daily_activity,
@@ -122,7 +123,18 @@ async def season_create(request: Request, session: dict = Depends(require_admin)
                 f"/admin/seasons?error=Dates+overlap+with+existing+season+%22{conflict.name}%22",
                 status_code=302,
             )
-        db.add(Season(name=name, start_date=start, end_date=end))
+        new_season = Season(name=name, start_date=start, end_date=end)
+        db.add(new_season)
+        db.flush()
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="season.created",
+            target_type="season",
+            target_id=str(new_season.id),
+            details={"name": name, "start": start.isoformat(), "end": end.isoformat()},
+        )
         db.commit()
         log.info("Season created: %s (%s – %s) by %s", name, start, end, session.get("email"))
     finally:
@@ -154,9 +166,19 @@ async def season_edit(request: Request, season_id: int, session: dict = Depends(
                 f"/admin/seasons/{season_id}?flash=Dates+overlap+with+existing+season+%22{conflict.name}%22",
                 status_code=302,
             )
+        old = {"name": s.name, "start": s.start_date.isoformat(), "end": s.end_date.isoformat()}
         s.name = name
         s.start_date = start
         s.end_date = end
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="season.edited",
+            target_type="season",
+            target_id=str(season_id),
+            details={"old": old, "new": {"name": name, "start": start.isoformat(), "end": end.isoformat()}},
+        )
         db.commit()
         log.info("Season %s updated by %s", season_id, session.get("email"))
     finally:
@@ -172,6 +194,15 @@ async def season_delete(request: Request, season_id: int, session: dict = Depend
         s = db.get(Season, season_id)
         if s:
             name = s.name
+            audit.record(
+                db,
+                actor_email=session["email"],
+                actor_role=session.get("role", "admin"),
+                action="season.deleted",
+                target_type="season",
+                target_id=str(season_id),
+                details={"name": name, "start": s.start_date.isoformat(), "end": s.end_date.isoformat()},
+            )
             db.delete(s)
             db.commit()
             log.info("Season %s (%s) deleted by %s", season_id, name, session.get("email"))

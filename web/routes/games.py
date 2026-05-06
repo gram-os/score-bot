@@ -18,6 +18,7 @@ from bot.database import (
     preview_recalculate_game_ranks,
     recalculate_game_ranks,
 )
+from bot.db import audit
 from web.deps import _db_session, fetch_all_games, require_admin, templates
 
 log = logging.getLogger(__name__)
@@ -195,6 +196,15 @@ async def game_recalculate(
     db = _db_session()
     try:
         affected = recalculate_game_ranks(db, game_id, start_date=start, end_date=end)
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="game.recalculated",
+            target_type="game",
+            target_id=game_id,
+            details={"start": start.isoformat(), "end": end.isoformat(), "dates_affected": affected},
+        )
         db.commit()
     finally:
         db.close()
@@ -221,7 +231,17 @@ async def game_set_url(
     try:
         game = db.get(Game, game_id)
         if game:
+            old_url = game.url
             game.url = url.strip() or None
+            audit.record(
+                db,
+                actor_email=session["email"],
+                actor_role=session.get("role", "admin"),
+                action="game.url_set",
+                target_type="game",
+                target_id=game_id,
+                details={"old": old_url, "new": game.url},
+            )
             db.commit()
             log.info("Admin %s set url for game %s to %s", session["email"], game_id, game.url)
             request.session["flash"] = f"URL updated for {game.name}."
@@ -245,7 +265,17 @@ async def game_set_multiplier(
         game = db.get(Game, game_id)
         if not game:
             return RedirectResponse(url="/admin/games", status_code=302)
+        old_multiplier = game.difficulty_multiplier
         game.difficulty_multiplier = round(multiplier, 4)
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="game.multiplier_set",
+            target_type="game",
+            target_id=game_id,
+            details={"old": old_multiplier, "new": game.difficulty_multiplier},
+        )
         db.commit()
         log.info("Admin %s set multiplier for %s to %.4f", session["email"], game_id, multiplier)
         request.session["flash"] = f"Multiplier set to {multiplier:.4g}×. Use Recalculate to apply to existing scores."
@@ -265,6 +295,15 @@ async def game_toggle(
         game = db.get(Game, game_id)
         if game:
             game.enabled = not game.enabled
+            audit.record(
+                db,
+                actor_email=session["email"],
+                actor_role=session.get("role", "admin"),
+                action="game.toggled",
+                target_type="game",
+                target_id=game_id,
+                details={"enabled": game.enabled},
+            )
             db.commit()
             state = "enabled" if game.enabled else "disabled"
             log.info("Admin %s %s game %s", session["email"], state, game_id)

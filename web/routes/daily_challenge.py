@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
-from bot.db import daily_challenge
+from bot.db import audit, daily_challenge
 from bot.db.config import SCORING_TZ
 from web.deps import _db_session, fetch_all_games, require_admin, templates
 
@@ -61,6 +61,15 @@ async def daily_challenge_toggle(
     try:
         new_enabled = enabled.lower() == "true"
         daily_challenge.set_enabled(db, new_enabled)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="daily_challenge.toggled",
+            target_type="config",
+            target_id="daily_challenge.enabled",
+            details={"enabled": new_enabled},
+        )
         db.commit()
     finally:
         db.close()
@@ -81,6 +90,15 @@ async def daily_challenge_set_mode(
     db = _db_session()
     try:
         daily_challenge.set_mode(db, mode)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="daily_challenge.mode_set",
+            target_type="config",
+            target_id="daily_challenge.mode",
+            details={"mode": mode},
+        )
         db.commit()
     finally:
         db.close()
@@ -99,6 +117,15 @@ async def daily_challenge_set_multiplier(
     try:
         try:
             daily_challenge.set_multiplier(db, multiplier)
+            audit.record(
+                db,
+                actor_email=admin_session["email"],
+                actor_role=admin_session.get("role", "admin"),
+                action="daily_challenge.multiplier_set",
+                target_type="config",
+                target_id="daily_challenge.multiplier",
+                details={"multiplier": multiplier},
+            )
             db.commit()
             request.session["flash"] = f"Multiplier set to {multiplier}."
         except ValueError as e:
@@ -121,7 +148,17 @@ async def daily_challenge_manual_pick(
         if daily_challenge.get_mode(db) != "manual":
             request.session["flash"] = "Manual pick is only available in manual mode."
             return RedirectResponse(url="/admin" + _DAILY_CHALLENGE_PATH, status_code=303)
-        daily_challenge.set_today_game_id(db, game_id, _today_et())
+        today = _today_et()
+        daily_challenge.set_today_game_id(db, game_id, today)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="daily_challenge.manual_pick",
+            target_type="config",
+            target_id="daily_challenge.today_game_id",
+            details={"game_id": game_id, "date": today.isoformat()},
+        )
         db.commit()
     finally:
         db.close()
@@ -137,7 +174,17 @@ async def daily_challenge_reroll(
 ):
     db = _db_session()
     try:
-        chosen = daily_challenge.roll_random_game(db, _today_et())
+        today = _today_et()
+        chosen = daily_challenge.roll_random_game(db, today)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="daily_challenge.rerolled",
+            target_type="config",
+            target_id="daily_challenge.today_game_id",
+            details={"chosen": chosen, "date": today.isoformat()},
+        )
         db.commit()
     finally:
         db.close()

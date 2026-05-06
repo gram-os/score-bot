@@ -13,6 +13,7 @@ from bot.database import (
     rebuild_all_streaks,
     reset_all_submissions,
 )
+from bot.db import audit
 from bot.db.config import SCORING_TZ
 from bot.db.submissions import redate_submissions
 from bot.parsers.registry import all_parsers
@@ -105,6 +106,15 @@ async def tools_bulk_delete(
     db = _db_session()
     try:
         count = bulk_delete_submissions(db, game_id, submission_date)
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="submissions.bulk_deleted",
+            target_type="game",
+            target_id=game_id,
+            details={"date": date, "count": count},
+        )
         db.commit()
     finally:
         db.close()
@@ -176,6 +186,21 @@ async def tools_backfill(
     db = _db_session()
     try:
         backfill_result = process_messages(db, messages)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="submissions.backfilled",
+            target_type="range",
+            target_id=f"{start_date}_{end_date}",
+            details={
+                "start": start_date,
+                "end": end_date,
+                "recorded": len(backfill_result.recorded),
+                "duplicates": len(backfill_result.duplicates),
+                "errors": len(backfill_result.errors),
+            },
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -254,6 +279,19 @@ async def tools_backfill_message(
     db = _db_session()
     try:
         single_backfill_result = process_messages(db, [msg])
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="submissions.backfilled_single",
+            target_type="message",
+            target_id=message_id.strip(),
+            details={
+                "recorded": len(single_backfill_result.recorded),
+                "duplicates": len(single_backfill_result.duplicates),
+                "errors": len(single_backfill_result.errors),
+            },
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -307,6 +345,20 @@ async def tools_reset_all(
     db = _db_session()
     try:
         result = reset_all_submissions(db)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="submissions.reset_all",
+            target_type="global",
+            target_id="all",
+            details={
+                "submissions_deleted": result.submissions_deleted,
+                "streaks_deleted": result.streaks_deleted,
+                "achievements_deleted": result.achievements_deleted,
+                "snapshots_deleted": result.snapshots_deleted,
+            },
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -339,6 +391,15 @@ async def tools_rebuild_streaks(
     db = _db_session()
     try:
         count = rebuild_all_streaks(db)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="streaks.rebuilt",
+            target_type="global",
+            target_id="all",
+            details={"submissions_replayed": count},
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -359,6 +420,15 @@ async def tools_redate_submissions(
     db = _db_session()
     try:
         result = redate_submissions(db)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="submissions.redated",
+            target_type="global",
+            target_id="all",
+            details={"fixed": result.fixed, "skipped": result.skipped},
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -387,6 +457,19 @@ async def tools_backfill_monthly_ranks(
     db = _db_session()
     try:
         result = backfill_monthly_rank_snapshots(db)
+        audit.record(
+            db,
+            actor_email=admin_session["email"],
+            actor_role=admin_session.get("role", "admin"),
+            action="monthly_ranks.backfilled",
+            target_type="global",
+            target_id="all",
+            details={
+                "records_created": result.records_created,
+                "months_processed": result.months_processed,
+                "months_skipped": result.months_skipped,
+            },
+        )
         db.commit()
     except Exception:
         db.rollback()

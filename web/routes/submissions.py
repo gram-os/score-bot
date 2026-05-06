@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy import func, select
 
 from bot.database import Game, Submission, add_submission_manual, delete_submission
+from bot.db import audit
 from web.deps import PAGE_SIZE, _db_session, build_page_url, fetch_all_games, require_admin, templates
 
 log = logging.getLogger(__name__)
@@ -177,7 +178,22 @@ async def submission_new_submit(
                 status_code=422,
             )
         submission_date = date_type.fromisoformat(date)
-        add_submission_manual(db, user_id, username, game_id, submission_date, base_score, parsed_raw)
+        new_sub = add_submission_manual(db, user_id, username, game_id, submission_date, base_score, parsed_raw)
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="submission.added",
+            target_type="submission",
+            target_id=str(new_sub.id),
+            details={
+                "user_id": user_id,
+                "username": username,
+                "game_id": game_id,
+                "date": date,
+                "base_score": base_score,
+            },
+        )
         db.commit()
     finally:
         db.close()
@@ -201,7 +217,28 @@ async def submission_delete(
 ):
     db = _db_session()
     try:
+        sub = db.get(Submission, submission_id)
+        details = (
+            {
+                "user_id": sub.user_id,
+                "username": sub.username,
+                "game_id": sub.game_id,
+                "date": sub.date.isoformat(),
+                "base_score": sub.base_score,
+            }
+            if sub
+            else {}
+        )
         delete_submission(db, submission_id)
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="submission.deleted",
+            target_type="submission",
+            target_id=str(submission_id),
+            details=details,
+        )
         db.commit()
     finally:
         db.close()
