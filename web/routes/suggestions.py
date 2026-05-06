@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 
 from bot.database import Game, GameSuggestion
+from bot.db import audit
 from web.deps import _db_session, require_admin, templates
 
 log = logging.getLogger(__name__)
@@ -61,7 +62,17 @@ async def update_suggestion_status(
         suggestion = db.get(GameSuggestion, suggestion_id)
         if not suggestion:
             return JSONResponse({"error": "not found"}, status_code=404)
+        old_status = suggestion.status
         suggestion.status = status
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="suggestion.status_changed",
+            target_type="suggestion",
+            target_id=str(suggestion_id),
+            details={"old": old_status, "new": status, "game_name": suggestion.game_name},
+        )
         db.commit()
     finally:
         db.close()
@@ -90,6 +101,15 @@ async def promote_suggestion(
             return RedirectResponse(f"/admin/suggestions?error=Game+ID+%22{game_id}%22+already+exists", status_code=303)
         db.add(Game(id=game_id, name=game_name, enabled=True))
         suggestion.status = "accepted"
+        audit.record(
+            db,
+            actor_email=session["email"],
+            actor_role=session.get("role", "admin"),
+            action="suggestion.promoted",
+            target_type="suggestion",
+            target_id=str(suggestion_id),
+            details={"game_id": game_id, "game_name": game_name},
+        )
         db.commit()
         log.info(
             "Admin %s promoted suggestion %s to game %s (%s)",
