@@ -13,6 +13,7 @@ from bot.database import (
     get_game_difficulty_metrics,
     get_game_raw_data_breakdown,
     get_game_speed_bonus_stats,
+    get_game_submission_heatmap,
     get_leaderboard,
     get_score_distribution,
     preview_recalculate_game_ranks,
@@ -98,6 +99,7 @@ async def game_detail_stats(
         score_over_time = get_avg_score_over_time(db, game_id, days=60)
         breakdown = get_game_raw_data_breakdown(db, game_id)
         speed_stats = get_game_speed_bonus_stats(db, game_id)
+        heatmap = get_game_submission_heatmap(db, game_id, days=91)
     finally:
         db.close()
 
@@ -116,6 +118,10 @@ async def game_detail_stats(
                 "rank2": speed_stats.rank2_count,
                 "rank3": speed_stats.rank3_count,
             },
+            "heatmap": [
+                {"date": c.date, "count": c.count, "weekday": c.weekday, "week": c.week}
+                for c in heatmap
+            ],
         }
     )
 

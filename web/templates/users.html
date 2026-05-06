@@ -3,10 +3,32 @@
 {% block content %}
 <h2>Users</h2>
 
+{% macro health_badge(last_date) %}
+  {% if last_date %}
+    {% set days_ago = (today - last_date).days %}
+    {% if days_ago <= 7 %}
+      <span class="badge" style="background:var(--c-success);color:#fff;" title="{{ days_ago }}d ago">Active</span>
+    {% elif days_ago <= 30 %}
+      <span class="badge badge-warning" title="{{ days_ago }}d ago">At Risk</span>
+    {% else %}
+      <span class="badge badge-error" title="{{ days_ago }}d ago">Churned</span>
+    {% endif %}
+  {% else %}
+    <span class="badge" style="opacity:0.4;">—</span>
+  {% endif %}
+{% endmacro %}
+
 {% if users %}
-<div style="margin-bottom:12px;">
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
   <input type="text" id="user-filter" placeholder="Filter by username…"
          class="input" style="width:240px;">
+  <select id="health-filter" class="input" style="width:130px;">
+    <option value="">All statuses</option>
+    <option value="Active">Active</option>
+    <option value="At Risk">At Risk</option>
+    <option value="Churned">Churned</option>
+  </select>
+  <a href="/admin/retention" class="btn btn-secondary" style="text-decoration:none;">Retention Dashboard</a>
 </div>
 <table>
   <thead>
@@ -17,6 +39,7 @@
       <th>Submissions</th>
       <th>Games</th>
       <th>Last Active</th>
+      <th>Health</th>
       <th></th>
     </tr>
   </thead>
@@ -29,6 +52,7 @@
       <td>{{ u.submission_count }}</td>
       <td>{{ u.game_count }}</td>
       <td>{{ u.last_date or '—' }}</td>
+      <td>{{ health_badge(u.last_date) }}</td>
       <td>
         <a href="/admin/users/{{ u.user_id }}" class="btn btn-secondary" style="text-decoration:none;">View</a>
       </td>
@@ -41,12 +65,24 @@
 {% endif %}
 
 <script>
-document.getElementById('user-filter')?.addEventListener('input', function () {
-  const q = this.value.toLowerCase();
-  document.querySelectorAll('tbody tr').forEach(row => {
-    const username = (row.cells[1]?.innerText ?? '').toLowerCase();
-    row.style.display = username.includes(q) ? '' : 'none';
-  });
-});
+(function () {
+  const nameFilter   = document.getElementById('user-filter');
+  const healthFilter = document.getElementById('health-filter');
+
+  function applyFilters() {
+    const q      = (nameFilter?.value ?? '').toLowerCase();
+    const health = (healthFilter?.value ?? '').toLowerCase();
+    document.querySelectorAll('tbody tr').forEach(row => {
+      const username = (row.cells[1]?.innerText ?? '').toLowerCase();
+      const badge    = (row.cells[6]?.innerText ?? '').trim().toLowerCase();
+      const nameOk   = !q      || username.includes(q);
+      const healthOk = !health || badge === health.toLowerCase();
+      row.style.display = (nameOk && healthOk) ? '' : 'none';
+    });
+  }
+
+  nameFilter?.addEventListener('input', applyFilters);
+  healthFilter?.addEventListener('change', applyFilters);
+})();
 </script>
 {% endblock %}

@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from bot.database import Game, GameSuggestion
 from bot.db import audit
+from bot.db.suggestions import get_suggestion_stats
 from web.deps import _db_session, require_admin, templates
 
 log = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ async def suggestions_view(
     try:
         rows = db.execute(select(GameSuggestion).order_by(GameSuggestion.suggested_at.desc())).scalars().all()
         suggestions = [_serialize(s) for s in rows]
+        stats = get_suggestion_stats(db)
     finally:
         db.close()
     return templates.TemplateResponse(
@@ -43,6 +45,7 @@ async def suggestions_view(
         {
             "active": "suggestions",
             "suggestions": suggestions,
+            "stats": stats,
             "flash": request.query_params.get("flash"),
             "error": request.query_params.get("error"),
         },

@@ -9,6 +9,7 @@ from bot.db import audit
 from bot.db.models import Season, get_engine
 from bot.db.season_stats import (
     get_season_daily_activity,
+    get_season_forecast,
     get_season_game_breakdown,
     get_season_leaderboard,
     get_season_stats,
@@ -69,21 +70,21 @@ async def seasons_list(request: Request, session: dict = Depends(require_admin))
 
 @router.get("/seasons/{season_id}")
 async def season_detail(request: Request, season_id: int, session: dict = Depends(require_admin)):
+    today = date.today()
     db = _db_session()
     try:
         season = db.get(Season, season_id)
         if not season:
             return RedirectResponse("/admin/seasons?error=Season+not+found", status_code=302)
+        is_current = season.start_date <= today <= season.end_date
+        is_future = season.start_date > today
         stats = get_season_stats(db, season)
         leaderboard = get_season_leaderboard(db, season)
         game_breakdown = get_season_game_breakdown(db, season)
         daily_activity = get_season_daily_activity(db, season)
+        forecast = get_season_forecast(db, season) if is_current else []
     finally:
         db.close()
-
-    today = date.today()
-    is_current = season.start_date <= today <= season.end_date
-    is_future = season.start_date > today
 
     return templates.TemplateResponse(
         request,
@@ -95,6 +96,7 @@ async def season_detail(request: Request, season_id: int, session: dict = Depend
             "leaderboard": leaderboard,
             "game_breakdown": game_breakdown,
             "daily_activity": [{"date": p.date, "count": p.count} for p in daily_activity],
+            "forecast": forecast,
             "is_current": is_current,
             "is_future": is_future,
             "today": today,
