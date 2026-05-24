@@ -5,8 +5,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from bot.achievements import check_and_award_achievements
-from bot.database import Base, Game, Submission, User, UserStreak
+from bot.achievements import GAME_MVP_BADGES, check_and_award_achievements, resolve_achievement_def
+from bot.database import Base, Game, Season, Submission, User, UserStreak
+from bot.db.achievements import award_game_mvp, get_season_game_top_scorers
 
 
 @pytest.fixture(scope="module")
@@ -158,3 +159,69 @@ class TestFreezeAchievement:
         streak = _make_streak(current=5)
         slugs = check_and_award_achievements(session, "u1", "wordle", date(2026, 8, 2), streak, sub, False, 3)
         assert "freeze_saver" not in slugs
+
+
+class TestGameMvpBadges:
+    def test_resolve_all_game_mvp_slugs(self):
+        for game_id, badge in GAME_MVP_BADGES.items():
+            slug = f"game_mvp_{game_id}_season_1"
+            resolved = resolve_achievement_def(slug)
+            assert resolved is not None, f"Could not resolve slug for game_id={game_id}"
+            assert resolved.name == badge.name
+
+    def test_resolve_unknown_game_returns_none(self):
+        assert resolve_achievement_def("game_mvp_unknown_game_season_1") is None
+
+    def test_award_game_mvp_newly_awarded(self, session):
+        awarded = award_game_mvp(session, "u1", "wordle", 1, "Season 1", "Five-Letter Freak")
+        assert awarded is True
+
+    def test_award_game_mvp_idempotent(self, session):
+        award_game_mvp(session, "u1", "glyph", 1, "Season 1", "Hieroglyph Haver")
+        awarded_again = award_game_mvp(session, "u1", "glyph", 1, "Season 1", "Hieroglyph Haver")
+        assert awarded_again is False
+
+    def test_get_season_game_top_scorers(self, session):
+        season = Season(name="Season 1", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
+        session.add(season)
+        session.flush()
+
+        u2 = User(user_id="u2", username="Runner", updated_at=datetime.now(timezone.utc).replace(tzinfo=None))
+        session.merge(u2)
+        session.flush()
+
+        session.add(
+            Submission(
+                user_id="u1",
+                username="Tester",
+                game_id="wordle",
+                date=date(2026, 9, 1),
+                base_score=100.0,
+                speed_bonus=0,
+                total_score=100.0,
+                submission_rank=1,
+                raw_data={},
+                submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+        )
+        session.add(
+            Submission(
+                user_id="u2",
+                username="Runner",
+                game_id="wordle",
+                date=date(2026, 9, 2),
+                base_score=60.0,
+                speed_bonus=0,
+                total_score=60.0,
+                submission_rank=1,
+                raw_data={},
+                submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+        )
+        session.flush()
+
+        rows = get_season_game_top_scorers(session, season)
+        wordle_mvp = next((r for r in rows if r.game_id == "wordle"), None)
+        assert wordle_mvp is not None
+        assert wordle_mvp.user_id == "u1"
+        assert wordle_mvp.total_score == 100.0

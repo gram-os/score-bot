@@ -1,4 +1,11 @@
-from bot.db.achievements import award_season_champion, get_season_champion_user_ids, get_user_achievements
+from bot.db.achievements import (
+    GameMvpRow,
+    award_game_mvp,
+    award_season_champion,
+    get_season_champion_user_ids,
+    get_season_game_top_scorers,
+    get_user_achievements,
+)
 from bot.db.analytics import (
     GameAnalysisRow,
     GameDifficultyMetrics,
@@ -185,7 +192,10 @@ __all__ = [
     "get_current_season",
     "get_season_ending_yesterday",
     "award_season_champion",
+    "award_game_mvp",
+    "GameMvpRow",
     "get_season_champion_user_ids",
+    "get_season_game_top_scorers",
     "get_user_achievements",
     "PersonalBests",
     "get_best_base_score",

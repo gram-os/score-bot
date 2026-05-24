@@ -4,12 +4,16 @@ import logging
 import discord
 from sqlalchemy import func, select
 
+from bot.achievements import GAME_MVP_BADGES
 from bot.config import SEASON_CHAMPION_ROLE_NAME
 from bot.database import (
+    GameMvpRow,
     Submission,
     User,
+    award_game_mvp,
     award_season_champion,
     get_season_ending_yesterday,
+    get_season_game_top_scorers,
     get_weekly_digest,
     get_yesterday_digest,
 )
@@ -89,6 +93,9 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
         season_champion_user_id: str | None = None
         season_end_embed: discord.Embed | None = None
 
+        game_mvp_rows: list[GameMvpRow] = []
+        game_mvp_embed: discord.Embed | None = None
+
         if ended_season:
             top_rows = session.execute(
                 select(
@@ -110,7 +117,6 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
             if top_rows:
                 champion_row = top_rows[0]
                 newly_awarded = award_season_champion(session, champion_row.user_id, ended_season.id, ended_season.name)
-                session.commit()
                 if newly_awarded:
                     season_champion_user_id = champion_row.user_id
                     log.info(
@@ -135,6 +141,42 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
                 )
                 season_end_embed.set_footer(text=f"{ended_season.start_date} – {ended_season.end_date}")
 
+            mvp_rows = get_season_game_top_scorers(session, ended_season)
+            for mvp in mvp_rows:
+                badge = GAME_MVP_BADGES.get(mvp.game_id)
+                if badge:
+                    newly = award_game_mvp(
+                        session,
+                        mvp.user_id,
+                        mvp.game_id,
+                        ended_season.id,
+                        ended_season.name,
+                        badge.name,
+                    )
+                    if newly:
+                        game_mvp_rows.append(mvp)
+                        log.info(
+                            "Game MVP '%s' awarded to %s for season %s",
+                            badge.name,
+                            mvp.username,
+                            ended_season.name,
+                        )
+
+            if game_mvp_rows:
+                mvp_lines = []
+                for mvp in game_mvp_rows:
+                    badge = GAME_MVP_BADGES[mvp.game_id]
+                    mvp_lines.append(
+                        f"{badge.icon} **{badge.name}** — {mvp.username} ({mvp.game_name}, {mvp.total_score:.0f} pts)"
+                    )
+                game_mvp_embed = discord.Embed(
+                    title=f"🎮  {ended_season.name} — Game MVPs",
+                    description="\n".join(mvp_lines),
+                    color=discord.Color.og_blurple(),
+                )
+
+            session.commit()
+
     if season_end_embed is not None:
         await channel.send(embed=season_end_embed)
 
@@ -149,6 +191,21 @@ async def send_weekly_digest(client: discord.Client, channel: discord.TextChanne
             log.warning("Could not DM season champion %s", season_champion_user_id)
 
         await _assign_champion_role(client, season_champion_user_id)
+
+    if game_mvp_embed is not None:
+        await channel.send(embed=game_mvp_embed)
+
+    for mvp in game_mvp_rows:
+        badge = GAME_MVP_BADGES[mvp.game_id]
+        try:
+            mvp_user = await client.fetch_user(int(mvp.user_id))
+            await mvp_user.send(
+                f"{badge.icon} You've been crowned **{badge.name}** — "
+                f"{ended_season.name}'s top **{mvp.game_name}** scorer! "
+                f"Achievement unlocked."
+            )
+        except Exception:
+            log.warning("Could not DM game MVP %s (%s)", mvp.username, mvp.game_id)
 
     if data.total_submissions == 0:
         return

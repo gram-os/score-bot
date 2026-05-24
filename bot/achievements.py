@@ -61,12 +61,39 @@ SEASON_CHAMPION_DEF = AchievementDef(
     "👑",
 )
 
+GAME_MVP_BADGES: dict[str, AchievementDef] = {
+    "wordle": AchievementDef("game_mvp_wordle", "Five-Letter Freak", "Top Wordle scorer of the season", "📝"),
+    "connections": AchievementDef("game_mvp_connections", "Purple Belt", "Top Connections scorer of the season", "🟪"),
+    "mini_crossword": AchievementDef(
+        "game_mvp_mini_crossword", "Mini Maestro", "Top Mini Crossword scorer of the season", "✏️"
+    ),
+    "quordle": AchievementDef("game_mvp_quordle", "Quad Goblin", "Top Quordle scorer of the season", "👹"),
+    "enclose_horse": AchievementDef(
+        "game_mvp_enclose_horse", "The Cowboy", "Top Enclose Horse scorer of the season", "🤠"
+    ),
+    "glyph": AchievementDef("game_mvp_glyph", "Hieroglyph Haver", "Top Glyph scorer of the season", "🏺"),
+    "pokedoku": AchievementDef(
+        "game_mvp_pokedoku", "Pokémon Professor", "Top Pokedoku scorer of the season", "🔬"
+    ),
+    "betweenle": AchievementDef(
+        "game_mvp_betweenle", "Dictionary Diver", "Top Betweenle scorer of the season", "📖"
+    ),
+    "time_guessr": AchievementDef(
+        "game_mvp_time_guessr", "Time Wizard", "Top TimeGuessr scorer of the season", "⏳"
+    ),
+}
+
 
 def resolve_achievement_def(slug: str) -> AchievementDef | None:
     if slug in ACHIEVEMENTS:
         return ACHIEVEMENTS[slug]
     if slug.startswith("season_champion_"):
         return SEASON_CHAMPION_DEF
+    if slug.startswith("game_mvp_"):
+        remainder = slug[len("game_mvp_"):]
+        for game_id, badge in GAME_MVP_BADGES.items():
+            if remainder.startswith(game_id + "_season_"):
+                return badge
     return None
 
 
