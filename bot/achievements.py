@@ -51,6 +51,18 @@ ACHIEVEMENTS: dict[str, AchievementDef] = {
             "Save a streak by using a freeze",
             "🧊",
         ),
+        AchievementDef(
+            "talking_to_the_void",
+            "Talking to the Void",
+            "Kept submitting scores during the Great Outage of June 2026",
+            "📡",
+        ),
+        AchievementDef(
+            "outage_witness",
+            "You Were There",
+            "Was an active player when the bot went dark in June 2026",
+            "🔌",
+        ),
     ]
 }
 
