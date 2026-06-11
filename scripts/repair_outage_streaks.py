@@ -48,9 +48,7 @@ def repair_outage_streaks(
     # day before the outage began and never got a chance to post during it.
     window_start = outage_start - timedelta(days=1)
 
-    rows = session.scalars(
-        select(UserStreak).where(UserStreak.last_submission_date.isnot(None))
-    ).all()
+    rows = session.scalars(select(UserStreak).where(UserStreak.last_submission_date.isnot(None))).all()
 
     repaired = 0
     for streak in rows:
@@ -100,17 +98,11 @@ def award_witness_achievement(
         return 0
 
     already_earned = set(
-        session.scalars(
-            select(UserAchievement.user_id).where(UserAchievement.achievement_slug == slug)
-        ).all()
+        session.scalars(select(UserAchievement.user_id).where(UserAchievement.achievement_slug == slug)).all()
     )
 
     # Anyone with at least one submission on or before the outage end — they existed.
-    active_user_ids = session.scalars(
-        select(Submission.user_id)
-        .where(Submission.date <= outage_end)
-        .distinct()
-    ).all()
+    active_user_ids = session.scalars(select(Submission.user_id).where(Submission.date <= outage_end).distinct()).all()
 
     awarded = 0
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -151,17 +143,13 @@ def award_outage_achievement(
         return 0
 
     already_earned = set(
-        session.scalars(
-            select(UserAchievement.user_id).where(UserAchievement.achievement_slug == slug)
-        ).all()
+        session.scalars(select(UserAchievement.user_id).where(UserAchievement.achievement_slug == slug)).all()
     )
 
     # Find all distinct users who have at least one submission during the outage window.
     # These are the brave souls who kept posting while the bot wasn't listening.
     active_user_ids = session.scalars(
-        select(Submission.user_id)
-        .where(Submission.date >= outage_start, Submission.date <= outage_end)
-        .distinct()
+        select(Submission.user_id).where(Submission.date >= outage_start, Submission.date <= outage_end).distinct()
     ).all()
 
     awarded = 0
@@ -174,10 +162,7 @@ def award_outage_achievement(
         user = session.get(User, user_id)
         username = user.username if user else user_id
 
-        print(
-            f"  {'[DRY RUN] ' if dry_run else ''}award "
-            f"talking_to_the_void → {username}"
-        )
+        print(f"  {'[DRY RUN] ' if dry_run else ''}award talking_to_the_void → {username}")
 
         if not dry_run:
             session.add(
@@ -222,25 +207,16 @@ def main() -> None:
     engine = get_engine(db_path)
 
     label = "[DRY RUN] " if args.dry_run else ""
-    print(
-        f"{label}Repairing streaks for outage "
-        f"{args.outage_start} → {args.outage_end}"
-    )
+    print(f"{label}Repairing streaks for outage {args.outage_start} → {args.outage_end}")
 
     with Session(engine) as session:
-        repaired = repair_outage_streaks(
-            session, args.outage_start, args.outage_end, args.dry_run
-        )
+        repaired = repair_outage_streaks(session, args.outage_start, args.outage_end, args.dry_run)
 
         print(f"\n{label}Awarding 'Talking to the Void' achievement...")
-        awarded_void = award_outage_achievement(
-            session, args.outage_start, args.outage_end, args.dry_run
-        )
+        awarded_void = award_outage_achievement(session, args.outage_start, args.outage_end, args.dry_run)
 
         print(f"\n{label}Awarding 'You Were There' achievement...")
-        awarded_witness = award_witness_achievement(
-            session, args.outage_end, args.dry_run
-        )
+        awarded_witness = award_witness_achievement(session, args.outage_end, args.dry_run)
 
         total_awarded = awarded_void + awarded_witness
 
